@@ -1,4 +1,4 @@
-Require Import Procrastinate.Procrastinate.
+Require Import Procrastination.Procrastination.
 
 Goal True.
   begin procrastination group g.

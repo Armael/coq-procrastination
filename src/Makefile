@@ -16,7 +16,7 @@ CONTRIB := $(shell $(COQBIN)coqc -where)/user-contrib
 # Compilation.
 
 export COQINCLUDE := \
-  -R $(shell pwd) Procrastinate \
+  -R $(shell pwd) Procrastination \
 
 export SERIOUS
 
@@ -32,7 +32,7 @@ clean:
 ############################################################################
 # Installation.
 
-TARGET  := $(CONTRIB)/Procrastinate
+TARGET  := $(CONTRIB)/Procrastination
 
 .PHONY: install uninstall
 

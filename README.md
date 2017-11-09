@@ -1,1 +1,1 @@
-# coq-procrastinate
+# coq-procrastination
