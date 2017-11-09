@@ -19,4 +19,5 @@ Goal True.
   exact I.
 
   end procrastination.
-Abort.
+  exists 0, 0, 0. reflexivity.
+Qed.

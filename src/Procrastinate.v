@@ -284,6 +284,10 @@ Abort.
 Goal Marker.end_procrastination True. mk_end_procrastination_helper 3.
 Abort.
 
+Lemma count_exists_helper :
+  forall G, (G -> True) -> nat -> nat.
+Proof. auto. Defined.
+
 End MkHelperLemmas.
 
 (******************************************************************************)
@@ -459,23 +463,39 @@ Local Ltac cleanup_conj_goal_core :=
     cleanup_conj_goal_aux H_P_clean P_clean
   end.
 
-Local Ltac count_exists t k :=
-  let t := eval hnf in t in
-  lazymatch t with
-  | @ex ?A ?P => count_exists_aux t k A P
-  | @sig ?A ?P => count_exists_aux t k A P
-  | @sigT ?A ?P => count_exists_aux t k A P
+Local Ltac count_exists_loop H k :=
+  let ty := type of H in
+  match ty with
+  | @ex _ _ => count_exists_loop_aux H k
+  | @sig _ _ => count_exists_loop_aux H k
+  | @sigT _ _ => count_exists_loop_aux H k
   | _ => k O
   end
 
-with count_exists_aux t k A P :=
+with count_exists_loop_aux H k :=
   let x := fresh in
-  evar (x : A);
-  count_exists (P x) ltac:(fun res => k (S res));
-  clear x.
+  destruct H as [x H];
+  count_exists_loop H ltac:(fun res => k (S res)).
 
-Goal exists a b c, a + b = c.
-  match goal with |- ?g => count_exists g ltac:(fun res => pose res) end.
+Local Ltac count_exists_aux ty :=
+  let n := fresh in
+  evar (n : nat);
+  apply (MkHelperLemmas.count_exists_helper ty); [
+    let H := fresh in
+    intro H;
+    count_exists_loop H ltac:(fun res => instantiate (n := res));
+    exact I
+  | exact n].
+
+Ltac count_exists g cont :=
+  let n := constr:(ltac:(count_exists_aux g) : nat) in
+  let n := eval cbv in n in
+  cont n.
+
+Goal Marker.end_procrastination (exists a b c, a + b = c).
+  match goal with |- Marker.end_procrastination ?g =>
+    count_exists g ltac:(fun n => assert (n = 3) by reflexivity)
+  end.
 Abort.
 
 Ltac end_procrastination_core :=
