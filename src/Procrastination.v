@@ -284,10 +284,6 @@ Abort.
 Goal Marker.end_procrastination True. mk_end_procrastination_helper 3.
 Abort.
 
-Lemma count_exists_helper :
-  forall G, (G -> True) -> nat -> nat.
-Proof. auto. Defined.
-
 End MkHelperLemmas.
 
 (******************************************************************************)
@@ -477,10 +473,14 @@ with count_exists_loop_aux H k :=
   destruct H as [x H];
   count_exists_loop H ltac:(fun res => k (S res)).
 
+Local Lemma count_exists_helper :
+  forall G, (G -> True) -> nat -> nat.
+Proof. auto. Defined.
+
 Local Ltac count_exists_aux ty :=
   let n := fresh in
   evar (n : nat);
-  apply (MkHelperLemmas.count_exists_helper ty); [
+  apply (count_exists_helper ty); [
     let H := fresh in
     intro H;
     count_exists_loop H ltac:(fun res => instantiate (n := res));
