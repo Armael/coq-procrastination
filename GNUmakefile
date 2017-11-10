@@ -6,8 +6,8 @@ all install uninstall:
 	@ $(MAKE) -C src $@
 
 examples: all
-	@ $(MAKE) -C examples/proofs
+	@ $(MAKE) -C examples
 
 clean:
 	@ $(MAKE) -C src $@
-	@ $(MAKE) -C examples/proofs $@
+	@ $(MAKE) -C examples $@
