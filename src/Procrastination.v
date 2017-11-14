@@ -1,4 +1,6 @@
 (******************************************************************************)
+(* Summary of the tactics exported by this file:                              *)
+(*                                                                            *)
 (* begin procrastination [group g] [assuming a b...]                          *)
 (* procrastinate [g]                                                          *)
 (* end procrastination                                                        *)
@@ -6,10 +8,26 @@
 (* with procrastination [group g] do cont                                     *)
 (******************************************************************************)
 
+(* Comments that follow describe the various tricks used for implementing the
+   library. For a higher-level description of what it does, and how to use it,
+   one should rather refer to the `examples/` directory.
+*)
+
+(* We define a couple "marker" definitions. These are equivalent to the
+   identity, but are useful to mark subterms to be used with tactics or
+   notations. *)
 Module Marker.
 
+(* This marker is used in combination with a notation (see the end of the file),
+   in order to hide the exact expression of a subgoal, and to indicate that
+   faced with this subgoal, the user always has to call the
+   [end procrastination] tactic. *)
 Definition end_procrastination (P : Type) := P.
 
+(* This marker is used to keep track of "group" assumptions in the context
+   (introduced by [begin procrastination]). This is useful so that tactics can
+   omit specifying a group: in that case, the first group of the context is
+   used. *)
 Definition group (P : Prop) := P.
 
 Ltac find_group :=
@@ -19,17 +37,78 @@ Ltac find_group :=
 
 End Marker.
 
+
+(* A very simple implementation of [begin procrastination] could be as follows:
+
+   ```
+   Lemma L0 : forall Goal group,
+     (group -> Goal) ->
+     group ->
+     Goal.
+
+   Ltac begin_procrastination := eapply L0.
+   ```
+
+   By using [eapply L0], [group] is introduced as an evar. Then, in the first
+   subgoal [group -> Goal], [procrastinate] can be used to discharge properties
+   to procrastinate, by raffining the [group] evar (which is of type [Prop]).
+   Then, in the second subgoal, one has to prove the properties collected in
+   [group].
+
+
+   Similarly, [begin procrastination assuming a] could be implemented as:
+
+   ```
+   Lemma L1 : forall A Goal (group : A -> Prop),
+     (forall a, group a -> Goal) ->
+     (exists a, group a) ->
+     Goal.
+
+   Ltac begin_procrastination_assuming_1 := eapply L1
+   ```
+
+   This allows us to procrastinate properties that depend on some parameter [a]
+   of type [A]. However we would like to have this for an arbitrary number of
+   parameters. This is the purpose of the tactics in the module below.
+
+
+   More precisely, the tactics below take an arity as parameter, and build the
+   statement of a lemma (similar to L0 or L1) for that arity. To achieve that
+   using Ltac, we do not try to construct the term corresponding to the lemma's
+   statement directly (this is not supported by Ltac). Instead, what we can do
+   is produce a subgoal (of type [Prop]) corresponding to the statement of the
+   lemma, and construct the statement using successive applications of the
+   [refine] tactic.
+
+   We start by defining some utility tactics, that help building bits of the
+   statements when following this methodology.
+*)
 Module MkHelperLemmas.
 
 (* General helpers *)
 
+(* [transparent_assert name type] produces a new subgoal of type [type], which
+   *proof term* will appear as a definition in the context of the main subgoal.
+
+   Here, [type] will be [Prop] or [Type], and the first subgoal will be proved
+   using multiple [refine], thus constructing the desired lemma statement.
+*)
 Local Ltac transparent_assert name type :=
   unshelve refine (let name := _ : type in _).
 
+(* This is generally useful in tactics to have lists of things (e.g.
+   assumptions) of heterogeneous types, by "boxing" them using [boxer]. *)
 Inductive Boxer :=
 | boxer : forall A : Type, A -> Boxer.
 Arguments boxer : clear implicits.
 
+(* [mk_forall varty goalty n cont], called on a goal of type [goalty] (e.g.
+   [Type] or [Prop]), refines its proof term to be [forall x_1 ... x_n, _],
+   where all [x_i] have type [varty].
+
+   The continuation [cont] is then called, with as argument the list of variable
+   names introduced, i.e. the list of (boxed) [x_i].
+*)
 Local Ltac mk_forall varty goalty n cont :=
   lazymatch n with
   | O => cont (@nil Boxer)
@@ -39,6 +118,10 @@ Local Ltac mk_forall varty goalty n cont :=
     mk_forall varty goalty n' ltac:(fun x => cont (cons (boxer varty X) x))
   end.
 
+(* [mk_forall_tys vartys goalty cont] is similar to [mk_forall], but the
+   variables introduced can now have different types, as specified by the list
+   [vartys].
+*)
 Local Ltac mk_forall_tys vartys goalty cont :=
   lazymatch vartys with
   | nil => cont (@nil Boxer)
@@ -48,6 +131,8 @@ Local Ltac mk_forall_tys vartys goalty cont :=
     mk_forall_tys tys goalty ltac:(fun x => cont (cons (boxer ty X) x))
   end.
 
+(* [mk_arrow vars goalty] refines the proof term to be [x_1 -> .. -> x_n -> _],
+   where [vars] is [[x_1; ..; x_n]]. *)
 Local Ltac mk_arrow vars goalty :=
   lazymatch vars with
   | nil => idtac
@@ -56,6 +141,8 @@ Local Ltac mk_arrow vars goalty :=
     mk_arrow vs goalty
   end.
 
+(* [mk_app f vars goalty] refines the proof term to be [f x_1 .. x_2], where
+   [vars] is [[x_1; ..; x_n]]. *)
 Local Ltac mk_app f vars goalty :=
   lazymatch vars with
   | nil => exact f
@@ -65,6 +152,9 @@ Local Ltac mk_app f vars goalty :=
     mk_app (f x) vs goalty
   end.
 
+(* [mk_sigT_sig n goalty cont] refines the proof term to be [sigT (fun x_1 => ..
+   sigT (fun x_n-1 => sig (fun x_n => _)))], then calls [cont] with the list of
+   variables introduced [[x_1; .. x_n]]. *)
 Local Ltac mk_sigT_sig n goalty cont :=
   lazymatch n with
   | 0 => cont (@nil Boxer)
@@ -78,6 +168,8 @@ Local Ltac mk_sigT_sig n goalty cont :=
     mk_sigT_sig n' goalty ltac:(fun x => cont (cons (@boxer _ X) x))
   end.
 
+(* Similarly, [mk_exists n goalty cont] refines the proof term to be [exists x_1
+   .. x_n, _], and calls [cont] with the list [[x_1; ..; x_n]]. *)
 Local Ltac mk_exists n goalty cont :=
   lazymatch n with
   | O => cont (@nil Boxer)
@@ -97,6 +189,8 @@ Local Ltac introsType :=
 
 (** [begin procrastination] helpers *)
 
+(* This tactic is able to prove the statements of helpers lemmas for [begin
+   procrastination], for any arity. *)
 Local Ltac prove_begin_procrastination_helper :=
   introsType;
   intros facts P H1 H;
@@ -104,6 +198,7 @@ Local Ltac prove_begin_procrastination_helper :=
   repeat (let x := fresh "x" in destruct H as (x & H));
   eauto.
 
+(* Tests for the tactic above. *)
 Goal forall (g : Prop) (P : Type),
     (Marker.group g -> P) ->
     Marker.end_procrastination g ->
@@ -128,8 +223,10 @@ Goal forall A B (g : A -> B -> Prop) (P : Type),
     P.
 Proof. prove_begin_procrastination_helper. Qed.
 
-(* Generates a definition G := ... . G then corresponds to a goal that can be
-   proved using [prove_begin_procrastination_helper], and is of the form:
+(* Tactic that generates lemmas statements as [begin procrastination] helpers.
+
+   Generates a definition G := ... . G then corresponds to a statement that can
+   be proved using [prove_begin_procrastination_helper], and is of the form:
 
   forall
     (A B .. Z : Type)
@@ -185,6 +282,8 @@ Local Ltac mk_begin_procrastination_helper_Prop n G :=
   mk_begin_procrastination_helper_aux n G Prop
     ltac:(fun n cont => mk_exists n Prop cont).
 
+(* When the goal is of type [Type], generate a statement using constructive
+   exists. When it is of type [Prop], use regular exists. *)
 Ltac mk_begin_procrastination_helper n :=
   let H := fresh in
   match goal with |- ?G =>
@@ -195,6 +294,7 @@ Ltac mk_begin_procrastination_helper n :=
     cut H; subst H; [| prove_begin_procrastination_helper]
   end.
 
+(* Tests *)
 Goal True. mk_begin_procrastination_helper 0. intro H; eapply H; clear H.
 Abort.
 
