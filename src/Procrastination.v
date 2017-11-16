@@ -5,7 +5,7 @@
 (* procrastinate [g]                                                          *)
 (* end procrastination                                                        *)
 (* already procrastinated [g]                                                 *)
-(* with procrastination [group g] do cont                                     *)
+(* with procrastination [group g] [do cont]                                   *)
 (******************************************************************************)
 
 (* Comments that follow describe the various tricks used for implementing the
@@ -500,6 +500,15 @@ Tactic Notation "with" "procrastination"
        "group" ident(g)
        "do" tactic(tac) :=
   with_procrastination_core g tac.
+
+Tactic Notation "with" "procrastination" :=
+  let g := Marker.find_group in
+  with_procrastination_core g ltac:(fun t => pose proof t).
+
+Tactic Notation "with" "procrastination"
+       "group" ident(g) :=
+  let g := Marker.find_group in
+  with_procrastination_core g ltac:(fun t => pose proof t).
 
 Goal True.
   begin procrastination group foo.
