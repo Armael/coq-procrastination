@@ -522,7 +522,7 @@ Abort.
 (** [already procrastinated] *)
 
 Ltac already_procrastinated_core g :=
-  solve [ with procrastination group g do (fun H => try apply H) ].
+  progress (with procrastination group g do (fun H => try (apply H))).
 
 Tactic Notation "already" "procrastinated" :=
   let g := Marker.find_group in
