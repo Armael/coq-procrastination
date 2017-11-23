@@ -50,10 +50,10 @@ End Marker.
    ```
 
    By using [eapply L0], [group] is introduced as an evar. Then, in the first
-   subgoal [group -> Goal], [procrastinate] can be used to discharge properties
-   to procrastinate, by raffining the [group] evar (which is of type [Prop]).
-   Then, in the second subgoal, one has to prove the properties collected in
-   [group].
+   subgoal [group -> Goal], [procrastinate] can be used to discharge
+   propositions to procrastinate, by raffining the [group] evar (which is of
+   type [Prop]). Then, in the second subgoal, one has to prove the propositions
+   collected in [group].
 
 
    Similarly, [begin procrastination assuming a] could be implemented as:
@@ -67,9 +67,9 @@ End Marker.
    Ltac begin_procrastination_assuming_1 := eapply L1
    ```
 
-   This allows us to procrastinate properties that depend on some parameter [a]
-   of type [A]. However we would like to have this for an arbitrary number of
-   parameters. This is the purpose of the tactics in the module below.
+   This allows us to procrastinate propositions that depend on some parameter
+   [a] of type [A]. However we would like to have this for an arbitrary number
+   of parameters. This is the purpose of the tactics in the module below.
 
 
    More precisely, the tactics below take an arity as parameter, and build the
@@ -79,6 +79,10 @@ End Marker.
    is produce a subgoal (of type [Prop]) corresponding to the statement of the
    lemma, and construct the statement using successive applications of the
    [refine] tactic.
+
+   The same set of tricks is used to implement [end procrastination], which
+   requires generating a "clean-up" lemma, which statement depends on the number
+   of "exists" introduced by [begin procrastination].
 
    We start by defining some utility tactics, that help building bits of the
    statements when following this methodology.
@@ -187,7 +191,7 @@ Local Ltac introsType :=
       end
     ).
 
-(** [begin procrastination] helpers *)
+(* [begin procrastination] helpers *)
 
 (* This tactic is able to prove the statements of helpers lemmas for [begin
    procrastination], for any arity. *)
@@ -228,20 +232,23 @@ Proof. prove_begin_procrastination_helper. Qed.
    Generates a definition G := ... . G then corresponds to a statement that can
    be proved using [prove_begin_procrastination_helper], and is of the form:
 
-  forall
-    (A B .. Z : Type)
-    (facts : A -> B -> .. -> Z -> Prop)
-    (P: Prop),
-  (forall a b .. z, Marker.group (facts a b .. z) -> P) ->
-  end_procrastination (exists a b .. z, facts a b .. z) ->
-  P.
+   ```
+   forall
+     (A B .. Z : Type)
+     (facts : A -> B -> .. -> Z -> Prop)
+     (P: Prop),
+   (forall a b .. z, Marker.group (facts a b .. z) -> P) ->
+   end_procrastination (exists a b .. z, facts a b .. z) ->
+   P.
+   ```
 
-  The type of P is actually taken as a parameter Pty (in practice, Prop or
-  Type), and the last hypothesis is produced by the argument tactic [mk_exists].
+   The type of P is actually taken as a parameter Pty (in practice, Prop or
+   Type), and the last hypothesis is produced by the argument tactic
+   [mk_exists].
 
-  When P is of type Prop, the last hypothesis is as shown, and uses exists.
-  When P is of type Type, the last hypothesis is instead of the form
-    sigT (fun a => sigT (fun b => ... sig (fun z => facts_closed a b .. z)))
+   When P is of type Prop, the last hypothesis is as shown, and uses exists.
+   When P is of type Type, the last hypothesis is instead of the form
+     sigT (fun a => sigT (fun b => ... sig (fun z => facts_closed a b .. z)))
 *)
 Local Ltac mk_begin_procrastination_helper_aux n G Pty mk_exists :=
   transparent_assert G Type;
@@ -304,8 +311,37 @@ Abort.
 Goal nat. mk_begin_procrastination_helper 3. intro H; eapply H; clear H.
 Abort.
 
-(** [end procrastination] helpers *)
+(* [end procrastination] helpers.
 
+   [end procrastination] is called on the second subgoal produced by [begin
+   procrastination], of the form [exists a .. z, group a .. z], where [group a
+   .. z] has been instantiated by [procrastinate] into something of the form [P1
+   /\ P2 /\ ... /\ Pn /\ ?P], where P1 .. Pn are the propositions that have been
+   procrastinated, and [?P] is the "accumulator" evar.
+
+   The role of [end procrastination] is to close the goal, instantiating [?P]
+   with [True], and removing it from the goal.
+
+   This is done by first applying a lemma of the form:
+
+   ```
+   forall A .. Z (G1 G2 : A -> .. -> Z -> Prop),
+   (forall a .. z, G1 a .. z -> G2 a .. z) ->
+   (exists a .. z, G1 a .. z) ->
+   exists a .. z, G2 a .. z
+   ```
+
+   After applying this lemma, [G2] is unified with the current goal (to clean),
+   and [G1] is introduced as an evar. An auxiliary tactic
+   ([cleanup_conj_goal_core], defined below) is called on the first subgoal, and
+   will discharge it, instantiating [G1] with the cleaned-up goal (i.e [P1 /\ P2
+   /\ ... /\ Pn]).
+
+   The helpers below help generating and proving this lemma, for any number of
+   variables [a] .. [z].
+*)
+
+(* Tactic that proves the lemma above for any arity. *)
 Local Ltac prove_end_procrastination_helper :=
   introsType;
   let P1 := fresh in
@@ -317,6 +353,7 @@ Local Ltac prove_end_procrastination_helper :=
   repeat (let x := fresh "x" in destruct H2 as (x & H2); exists x);
   apply H1; auto.
 
+(* Tests. *)
 Goal forall A (P1 P2 : A -> Prop),
   (forall a, P1 a -> P2 a) ->
   (exists a, P1 a) ->
@@ -335,6 +372,14 @@ Goal forall A (P1 P2 : A -> Prop),
   Marker.end_procrastination { a | P2 a }.
 Proof. prove_end_procrastination_helper. Qed.
 
+(* Generates a definition G := ... . G then corresponds to a statement that can
+   be proved using [prove_begin_procrastination_helper], and is of the form
+   detailed above.
+
+   [mk_exists] is used to refine the nested "exists", allowing the tactic to
+   produce statements using either exists in [Prop] ([exists]) or [Type]
+   ([sig]/[sigT]).
+ *)
 Local Ltac mk_end_procrastination_helper_aux n G mk_exists :=
   transparent_assert G Type;
   [ mk_forall Type Type n ltac:(fun L =>
@@ -368,6 +413,7 @@ Local Ltac mk_end_procrastination_helper_Prop n G :=
   mk_end_procrastination_helper_aux n G
     ltac:(fun n cont => mk_exists n Prop cont).
 
+(* Dispatch [mk_exists] depending on the type of the goal *)
 Ltac mk_end_procrastination_helper n :=
   let H := fresh in
   match goal with |- Marker.end_procrastination ?G =>
@@ -388,13 +434,24 @@ End MkHelperLemmas.
 
 (******************************************************************************)
 
-(** [begin procrastination] *)
+(* [begin procrastination [group g] [assuming a b...]]
+
+   If [group g] is not specified, a fresh named is used.
+*)
 
 Ltac begin_procrastination_core g n intros_tac :=
   MkHelperLemmas.mk_begin_procrastination_helper n;
   let H := fresh in
   intro H; eapply H; clear H;
   [ intros_tac tt; intro g | ].
+
+(* Unfortunately, despite the fact that our core tactic
+   [begin_procrastination_core] works for any arity, we have no choice but
+   manually exporting it for a given set of arities, as Ltac doesn't expose any
+   way of manipulating lists of identifiers.
+
+   See e.g. https://github.com/coq/coq/pull/6081
+*)
 
 Tactic Notation "begin" "procrastination" :=
   let g := fresh "g" in
@@ -444,12 +501,26 @@ Tactic Notation "begin" "procrastination"
        "assuming" ident(a) ident(b) ident(c) ident(d) :=
   begin_procrastination_core g 4 ltac:(fun tt => intros a b c d).
 
+(* Test *)
 Goal True.
   begin procrastination group foo assuming a b.
 Abort.
 
-(** [procrastinate] *)
+(* [procrastinate [g]]
 
+   If the name of the group [g] is not specified, the group that has been
+   introduced last is used.
+*)
+
+(* After unfolding markers, a group is a variable [g] in the context, of type of
+   the form [P1 /\ ... /\ Pk /\ ?P], where [P1 ... Pk] are the propositions that
+   have been previously procrastinated.
+
+   What [procrastinate] does is instantiating [?P] with [G /\ ?P'], where [G] is
+   the current goal, and [?P'] a newly introduced evar. The group now entails
+   the current goal, which [procrastinate] proves -- effectively delaying its
+   proof.
+*)
 Local Ltac procrastinate_aux tm ty :=
   let ty' := (eval simpl in ty) in
   lazymatch ty' with
@@ -469,6 +540,7 @@ Tactic Notation "procrastinate" :=
 Tactic Notation "procrastinate" ident(g) :=
   procrastinate_core g.
 
+(* Test *)
 Goal True.
   begin procrastination group foo.
   begin procrastination group bar.
@@ -476,7 +548,16 @@ Goal True.
   assert (2 = 2) by (procrastinate foo).
 Abort.
 
-(** [with procrastination] *)
+(* [with procrastination [group g] [do tac]]
+
+   If [group g] is omitted, the group that has been introduced last is used.
+
+   If [do tac] is omitted, adds to the context all proposition that have been
+   procrastinated so far.
+
+   When [do tac] is provided, with [tac] a valid tactic, calls [tac] on each
+   proposition stored in group [g].
+*)
 
 Local Ltac with_procrastination_aux tm ty tac :=
   lazymatch ty with
@@ -510,6 +591,7 @@ Tactic Notation "with" "procrastination"
   let g := Marker.find_group in
   with_procrastination_core g ltac:(fun t => pose proof t).
 
+(* Test *)
 Goal True.
   begin procrastination group foo.
   assert (1 + 1 = 2) by procrastinate.
@@ -519,7 +601,12 @@ Goal True.
   { with procrastination group foo do (fun H => try apply H). }
 Abort.
 
-(** [already procrastinated] *)
+(* [already procrastinated [g]]
+
+   If [g] is omitted, picks the group that has been introduced last.
+
+   Tries to apply one of the propositions collected in [g] to the goal.
+*)
 
 Ltac already_procrastinated_core g :=
   progress (with procrastination group g do (fun H => try (apply H))).
@@ -531,7 +618,7 @@ Tactic Notation "already" "procrastinated" :=
 Tactic Notation "already" "procrastinated" ident(g) :=
   already_procrastinated_core g.
 
-(** [end procrastination] *)
+(* [end procrastination] *)
 
 Local Ltac introv_rec :=
   lazymatch goal with
@@ -568,6 +655,8 @@ Local Ltac cleanup_conj_goal_core :=
     cleanup_conj_goal_aux H_P_clean P_clean
   end.
 
+(* A set of tactics to count the number of exists in the goal. This requires
+   crazy tricks, but surprisingly, works. *)
 Local Ltac count_exists_loop H k :=
   let ty := type of H in
   match ty with
@@ -596,11 +685,16 @@ Local Ltac count_exists_aux ty :=
     exact I
   | exact n].
 
+(* The [constr:(ltac:())] trick spawns a "ghost" goal of type [nat], in which
+   [count_exists_aux] is run; it returns its result by providing the right
+   number as proof of the goal.
+*)
 Ltac count_exists g cont :=
   let n := constr:(ltac:(count_exists_aux g) : nat) in
   let n := eval cbv in n in
   cont n.
 
+(* Test for [count_exists] *)
 Goal Marker.end_procrastination (exists a b c, a + b = c).
   match goal with |- Marker.end_procrastination ?g =>
     count_exists g ltac:(fun n => assert (n = 3) by reflexivity)
@@ -621,6 +715,7 @@ Ltac end_procrastination_core :=
 Tactic Notation "end" "procrastination" :=
   end_procrastination_core.
 
+(* Tests *)
 Goal True.
   begin procrastination group g.
 
@@ -644,8 +739,11 @@ Abort.
 
 (******************************************************************************)
 
-(** Notations for markers *)
+(* Notations for markers *)
 
+(* We denote this marker as [end procrastination], to informally indicate to the
+   user that such a goal should always be treated by calling the [end
+   procrastination] tactic. *)
 Notation "'end'  'procrastination'" :=
   (Marker.end_procrastination _) (at level 0).
 
