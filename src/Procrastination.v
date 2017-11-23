@@ -15,7 +15,7 @@
 
 (* We define a couple "marker" definitions. These are equivalent to the
    identity, but are useful to mark subterms to be used with tactics or
-   notations. *)
+   notation. *)
 Module Marker.
 
 (* This marker is used in combination with a notation (see the end of the file),
@@ -739,9 +739,9 @@ Abort.
 
 (******************************************************************************)
 
-(* Notations for markers *)
+(* Notation for markers *)
 
-(* We denote this marker as [end procrastination], to informally indicate to the
+(* We print this marker as [end procrastination], to informally indicate to the
    user that such a goal should always be treated by calling the [end
    procrastination] tactic. *)
 Notation "'end'  'procrastination'" :=
