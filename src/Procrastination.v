@@ -81,7 +81,7 @@ End Marker.
    [refine] tactic.
 
    The same set of tricks is used to implement [end procrastination], which
-   requires generating a "clean-up" lemma, which statement depends on the number
+   requires generating a "clean-up" lemma, whose statement depends on the number
    of "exists" introduced by [begin procrastination].
 
    We start by defining some utility tactics, that help building bits of the
@@ -91,7 +91,7 @@ Module MkHelperLemmas.
 
 (* General helpers *)
 
-(* [transparent_assert name type] produces a new subgoal of type [type], which
+(* [transparent_assert name type] produces a new subgoal of type [type], whose
    *proof term* will appear as a definition in the context of the main subgoal.
 
    Here, [type] will be [Prop] or [Type], and the first subgoal will be proved
@@ -193,7 +193,7 @@ Local Ltac introsType :=
 
 (* [begin procrastination] helpers *)
 
-(* This tactic is able to prove the statements of helpers lemmas for [begin
+(* This tactic is able to prove the statements of helper lemmas for [begin
    procrastination], for any arity. *)
 Local Ltac prove_begin_procrastination_helper :=
   introsType;
@@ -227,7 +227,7 @@ Goal forall A B (g : A -> B -> Prop) (P : Type),
     P.
 Proof. prove_begin_procrastination_helper. Qed.
 
-(* Tactic that generates lemmas statements as [begin procrastination] helpers.
+(* Tactic that generates lemma statements as [begin procrastination] helpers.
 
    Generates a definition G := ... . G then corresponds to a statement that can
    be proved using [prove_begin_procrastination_helper], and is of the form:
@@ -552,7 +552,7 @@ Abort.
 
    If [group g] is omitted, the group that has been introduced last is used.
 
-   If [do tac] is omitted, adds to the context all proposition that have been
+   If [do tac] is omitted, adds to the context all propositions that have been
    procrastinated so far.
 
    When [do tac] is provided, with [tac] a valid tactic, calls [tac] on each
