@@ -197,7 +197,8 @@ Local Ltac introsType :=
    procrastination], for any arity. *)
 Local Ltac prove_begin_procrastination_helper :=
   introsType;
-  intros facts P H1 H;
+  let H := fresh in
+  intros ? ? ? H;
   unfold Marker.end_procrastination in *;
   repeat (let x := fresh "x" in destruct H as (x & H));
   eauto.
