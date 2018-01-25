@@ -502,6 +502,16 @@ Tactic Notation "begin" "procrastination"
        "assuming" ident(a) ident(b) ident(c) ident(d) :=
   begin_procrastination_core g 4 ltac:(fun tt => intros a b c d).
 
+Tactic Notation "begin" "procrastination"
+       "assuming" ident(a) ident(b) ident(c) ident(d) ident(e) :=
+  let g := fresh "g" in
+  begin_procrastination_core g 5 ltac:(fun tt => intros a b c d e).
+
+Tactic Notation "begin" "procrastination"
+       "group" ident(g)
+       "assuming" ident(a) ident(b) ident(c) ident(d) ident(e) :=
+  begin_procrastination_core g 5 ltac:(fun tt => intros a b c d e).
+
 (* Test *)
 Goal True.
   begin procrastination group foo assuming a b.
