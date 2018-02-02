@@ -657,7 +657,8 @@ Local Ltac cleanup_conj_goal_aux tm ty :=
   | ?x => split; [apply tm | exact I]
   end.
 
-Local Ltac cleanup_conj_goal_core :=
+(* Expose this tactic as it may be useful for procrastination-like setups *)
+Ltac cleanup_conj_goal_core :=
   let H_P_clean := fresh "H_P_clean" in
   intro H_P_clean;
   match goal with
