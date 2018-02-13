@@ -2,9 +2,11 @@
 (* Summary of the tactics exported by this file:                              *)
 (*                                                                            *)
 (* begin procrastination [group g] [assuming a b...]                          *)
-(* procrastinate [g]                                                          *)
+(* procrastinate [group g]                                                    *)
+(* procrastinate [intropat] : H [group g]                                     *)
 (* end procrastination                                                        *)
-(* already procrastinated [g]                                                 *)
+(* already procrastinated [group g]                                           *)
+(* already procrastinated [intropat] : H [group g]                            *)
 (* with procrastination [group g] [do cont]                                   *)
 (******************************************************************************)
 
@@ -517,10 +519,14 @@ Goal True.
   begin procrastination group foo assuming a b.
 Abort.
 
-(* [procrastinate [g]]
+(* [procrastinate [group g]]
 
    If the name of the group [g] is not specified, the group that has been
    introduced last is used.
+
+   Also defines the [procrastinate [X]: H [group g]] helper tactic, which
+   asserts [H] (with optional name [X]) and procrastinates its proof in group
+   [g].
 *)
 
 (* After unfolding markers, a group is a variable [g] in the context, of type of
@@ -544,19 +550,36 @@ Ltac procrastinate_core group :=
   let ty' := (eval unfold Marker.group in ty) in
   procrastinate_aux group ty'.
 
-Tactic Notation "procrastinate" :=
-  let g := Marker.find_group in
+Tactic Notation "procrastinate" "group" ident(g) :=
   procrastinate_core g.
 
-Tactic Notation "procrastinate" ident(g) :=
-  procrastinate_core g.
+Tactic Notation "procrastinate" :=
+  let g := Marker.find_group in
+  procrastinate group g.
+
+Tactic Notation "procrastinate" simple_intropattern(i) ":" uconstr(H) "group" ident(g) :=
+  assert H as i by procrastinate_core g.
+
+Tactic Notation "procrastinate" ":" uconstr(H) "group" ident(g) :=
+  assert H by procrastinate_core g.
+
+Tactic Notation "procrastinate" simple_intropattern(i) ":" uconstr(H) :=
+  let g := Marker.find_group in
+  procrastinate i : H group g.
+
+Tactic Notation "procrastinate" ":" uconstr(H) :=
+  let g := Marker.find_group in
+  procrastinate: H group g.
 
 (* Test *)
 Goal True.
   begin procrastination group foo.
   begin procrastination group bar.
   assert (1 = 1) by procrastinate. (* goes in group [bar] *)
-  assert (2 = 2) by (procrastinate foo).
+  procrastinate: (2 = 2). (* same result *)
+  procrastinate E: (3 = 3). (* same result, allows naming the hypothesis *)
+  assert (4 = 4) by (procrastinate group foo). (* goes in group [foo] *)
+  procrastinate [E1 E2]: (5 = 5 /\ 6 = 6) group foo. (* same result *)
 Abort.
 
 (* [with procrastination [group g] [do tac]]
@@ -612,22 +635,41 @@ Goal True.
   { with procrastination group foo do (fun H => try apply H). }
 Abort.
 
-(* [already procrastinated [g]]
+(* [already procrastinated [group g]]
 
    If [g] is omitted, picks the group that has been introduced last.
 
    Tries to apply one of the propositions collected in [g] to the goal.
+
+
+   Also defines the [already procrastinated [X]: H [group g]] helper tactic,
+   which asserts [H] (with optional name [X]) and proves it using [already
+   procrastinated].
 *)
 
 Ltac already_procrastinated_core g :=
   progress (with procrastination group g do (fun H => try (apply H))).
 
-Tactic Notation "already" "procrastinated" :=
-  let g := Marker.find_group in
+Tactic Notation "already" "procrastinated" "group" ident(g) :=
   already_procrastinated_core g.
 
-Tactic Notation "already" "procrastinated" ident(g) :=
-  already_procrastinated_core g.
+Tactic Notation "already" "procrastinated" :=
+  let g := Marker.find_group in
+  already procrastinated group g.
+
+Tactic Notation "already" "procrastinated" simple_intropattern(i) ":" uconstr(H) "group" ident(g) :=
+  assert H as i by already procrastinated group g.
+
+Tactic Notation "already" "procrastinated" ":" uconstr(H) "group" ident(g) :=
+  assert H by already procrastinated group g.
+
+Tactic Notation "already" "procrastinated" simple_intropattern(i) ":" uconstr(H) :=
+  let g := Marker.find_group in
+  already procrastinated i : H group g.
+
+Tactic Notation "already" "procrastinated" ":" uconstr(H) :=
+  let g := Marker.find_group in
+  already procrastinated : H group g.
 
 (* [end procrastination] *)
 
@@ -731,9 +773,9 @@ Tactic Notation "end" "procrastination" :=
 Goal True.
   begin procrastination group g.
 
-  assert (H1 : 1 + 1 = 2) by (procrastinate g).
-  assert (H2 : 1 + 2 = 3) by (procrastinate g).
-  assert (H3 : 1 + 3 = 4) by (procrastinate g).
+  assert (H1 : 1 + 1 = 2) by (procrastinate group g).
+  assert (H2 : 1 + 2 = 3) by (procrastinate group g).
+  procrastinate H3: (1 + 3 = 4) group g.
 
   tauto.
   end procrastination.
@@ -743,7 +785,7 @@ Qed.
 
 Goal True.
   begin procrastination assuming a b c.
-  assert (a + b = c) by procrastinate. simpl in g.
+  assert (a + b = c). procrastinate. simpl in g.
   exact I.
 
   end procrastination.
