@@ -36,9 +36,3 @@ loop:
 
 clean::
 	rm -f `cat .gitignore`
-
-log: pdf
-	./decrypt.sh $(DOC).log
-
-export: pdf
-	scp -p -B -C $(DOC).pdf $(WWW)
