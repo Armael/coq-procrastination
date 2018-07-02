@@ -15,7 +15,7 @@ SOURCES  := \
 # ----------------------------------------------------------------------------
 # Generic rules.
 
-%.pdf: $(SOURCES)
+%.pdf: $(SOURCES) tactics_reference.tex
 	xelatex $(DOC).tex
 	bibtex $(DOC)
 	xelatex $(DOC).tex
@@ -27,6 +27,9 @@ SOURCES  := \
 .PHONY: pdf loop clean log export
 
 pdf: $(DOC).pdf
+
+tactics_reference.tex: ../TacticsReference.md
+	pandoc -o $@ $<
 
 loop:
 	latexmk -pdfxe -pvc $(DOC)

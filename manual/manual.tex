@@ -18,6 +18,8 @@
 \usepackage{adjustbox}
 \usepackage{tikz}
 \usepackage{tikzpagenodes}
+\usepackage{enumitem}
+\setitemize{itemsep=0.5em}
 
 \newcommand{\grule}{\rule{0.8\textwidth}{.4pt}}
 
@@ -492,7 +494,9 @@ implemented.
 %%\subsection{}
 %%% 3) reusable ltac components
 
-
+% because of pandoc
+\def\tightlist{}
+\input{tactics_reference}
 
 % ------------------------------------------------------------------------------
 % Bibliography.
