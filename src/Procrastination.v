@@ -12,7 +12,7 @@
 
 (* Comments that follow describe the various tricks used for implementing the
    library. For a higher-level description of what it does, and how to use it,
-   one should rather refer to the `examples/` directory.
+   one should rather refer to `Manual.md` and the `examples/` directory.
 *)
 
 (* We define a couple "marker" definitions. These are equivalent to the
@@ -709,61 +709,39 @@ Ltac cleanup_conj_goal_core :=
     cleanup_conj_goal_aux H_P_clean P_clean
   end.
 
-(* A set of tactics to count the number of exists in the goal. This requires
-   crazy tricks, but surprisingly, works. *)
-Local Ltac count_exists_loop H k :=
-  let ty := type of H in
-  match ty with
-  | @ex _ _ => count_exists_loop_aux H k
-  | @sig _ _ => count_exists_loop_aux H k
-  | @sigT _ _ => count_exists_loop_aux H k
-  | _ => k O
-  end
-
-with count_exists_loop_aux H k :=
-  let x := fresh in
-  destruct H as [x H];
-  count_exists_loop H ltac:(fun res => k (S res)).
-
-Local Lemma count_exists_helper :
-  forall G, (G -> True) -> nat -> nat.
-Proof. auto. Defined.
-
-Local Ltac count_exists_aux ty :=
-  let n := fresh in
-  evar (n : nat);
-  apply (count_exists_helper ty); [
-    let H := fresh in
-    intro H;
-    count_exists_loop H ltac:(fun res => instantiate (n := res));
-    exact I
-  | exact n].
-
-(* The [constr:(ltac:())] trick spawns a "ghost" goal of type [nat], in which
-   [count_exists_aux] is run; it returns its result by providing the right
-   number as proof of the goal.
+(* A tactic to count the number of exists in the goal. This uses the neat trick
+   provided in the comment section of
+   http://gallium.inria.fr/blog/how-to-quantify-quantifiers-an-ltac-puzzle/ (!)
+   which is apparently inspired by Adam Chlipala's book.
 *)
-Ltac count_exists g cont :=
-  let n := constr:(ltac:(count_exists_aux g) : nat) in
-  let n := eval cbv in n in
-  cont n.
+
+Ltac count_exists_loop G n :=
+  lazymatch G with
+  | (fun g => exists x, @?body g x) =>
+    count_exists_loop
+      ltac:(eval cbv beta in (fun g => body (fst g) (snd g))) (S n)
+  | _ => constr:(n)
+  end.
+
+Ltac count_exists g :=
+  count_exists_loop (fun (_:unit) => g) O.
 
 (* Test for [count_exists] *)
 Goal Marker.end_procrastination (exists a b c, a + b = c).
   match goal with |- Marker.end_procrastination ?g =>
-    count_exists g ltac:(fun n => assert (n = 3) by reflexivity)
+    let n := count_exists g in
+    assert (n = 3) by reflexivity
   end.
 Abort.
 
 Ltac end_procrastination_core :=
   match goal with
   |- Marker.end_procrastination ?g =>
-    count_exists g ltac:(fun n =>
-      MkHelperLemmas.mk_end_procrastination_helper n;
-      let H := fresh in
-      intro H; eapply H; clear H;
-      [ introv_rec; cleanup_conj_goal_core | hnf ]
-    )
+    let n := count_exists g in
+    MkHelperLemmas.mk_end_procrastination_helper n;
+    let H := fresh in
+    intro H; eapply H; clear H;
+    [ introv_rec; cleanup_conj_goal_core | hnf ]
   end.
 
 Tactic Notation "end" "procrastination" :=
