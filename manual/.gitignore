@@ -1,0 +1,26 @@
+# BEWARE: this list is used by [make clean], too.
+*~
+*.log
+*.aux
+*.dvi
+*.bbl
+*.blg
+*.toc
+*.thm
+*.idx
+*.ndx
+*.ind
+*.nnd
+*.pdf
+*.def
+*.wdvi
+*.waux
+._whizzy*
+_whizzy*
+*.out
+*.ans
+*.raux
+*.fmt
+*.fls
+*.fdb_latexmk
+*.xdv
