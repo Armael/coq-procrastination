@@ -4,8 +4,8 @@ A small Coq library for collecting side conditions and deferring their proof.
 
 ## Purpose & documentation
 
-See the [manual](manual/manual.pdf) for a detailed introduction, and
-the [Tactics reference](TacticsReference.md).
+See the [manual](https://armael.github.io/coq-procrastination/manual/manual.pdf)
+for a detailed introduction, and the [Tactics reference](TacticsReference.md).
 
 ## Installation
 
