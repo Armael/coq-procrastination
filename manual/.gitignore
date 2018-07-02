@@ -24,3 +24,4 @@ _whizzy*
 *.fdb_latexmk
 *.xdv
 tactics_reference.tex
+*.pdf
