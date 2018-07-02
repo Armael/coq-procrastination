@@ -99,7 +99,7 @@ Module MkHelperLemmas.
    Here, [type] will be [Prop] or [Type], and the first subgoal will be proved
    using multiple [refine], thus constructing the desired lemma statement.
 *)
-Local Ltac transparent_assert name type :=
+Ltac transparent_assert name type :=
   unshelve refine (let name := _ : type in _).
 
 (* This is generally useful in tactics to have lists of things (e.g.
@@ -115,7 +115,7 @@ Arguments boxer : clear implicits.
    The continuation [cont] is then called, with as argument the list of variable
    names introduced, i.e. the list of (boxed) [x_i].
 *)
-Local Ltac mk_forall varty goalty n cont :=
+Ltac mk_forall varty goalty n cont :=
   lazymatch n with
   | O => cont (@nil Boxer)
   | S ?n' =>
@@ -128,7 +128,7 @@ Local Ltac mk_forall varty goalty n cont :=
    variables introduced can now have different types, as specified by the list
    [vartys].
 *)
-Local Ltac mk_forall_tys vartys goalty cont :=
+Ltac mk_forall_tys vartys goalty cont :=
   lazymatch vartys with
   | nil => cont (@nil Boxer)
   | cons (boxer _ ?ty) ?tys =>
@@ -139,7 +139,7 @@ Local Ltac mk_forall_tys vartys goalty cont :=
 
 (* [mk_arrow vars goalty] refines the proof term to be [x_1 -> .. -> x_n -> _],
    where [vars] is [[x_1; ..; x_n]]. *)
-Local Ltac mk_arrow vars goalty :=
+Ltac mk_arrow vars goalty :=
   lazymatch vars with
   | nil => idtac
   | cons (boxer _ ?v) ?vs =>
@@ -149,7 +149,7 @@ Local Ltac mk_arrow vars goalty :=
 
 (* [mk_app f vars goalty] refines the proof term to be [f x_1 .. x_2], where
    [vars] is [[x_1; ..; x_n]]. *)
-Local Ltac mk_app f vars goalty :=
+Ltac mk_app f vars goalty :=
   lazymatch vars with
   | nil => exact f
   | cons (boxer _ ?v) ?vs =>
@@ -161,7 +161,7 @@ Local Ltac mk_app f vars goalty :=
 (* [mk_sigT_sig n goalty cont] refines the proof term to be [sigT (fun x_1 => ..
    sigT (fun x_n-1 => sig (fun x_n => _)))], then calls [cont] with the list of
    variables introduced [[x_1; .. x_n]]. *)
-Local Ltac mk_sigT_sig n goalty cont :=
+Ltac mk_sigT_sig n goalty cont :=
   lazymatch n with
   | 0 => cont (@nil Boxer)
   | 1 =>
@@ -176,7 +176,7 @@ Local Ltac mk_sigT_sig n goalty cont :=
 
 (* Similarly, [mk_exists n goalty cont] refines the proof term to be [exists x_1
    .. x_n, _], and calls [cont] with the list [[x_1; ..; x_n]]. *)
-Local Ltac mk_exists n goalty cont :=
+Ltac mk_exists n goalty cont :=
   lazymatch n with
   | O => cont (@nil Boxer)
   | S ?n' =>
@@ -185,7 +185,7 @@ Local Ltac mk_exists n goalty cont :=
     mk_exists n' goalty ltac:(fun x => cont (cons (@boxer _ X) x))
   end.
 
-Local Ltac introsType :=
+Ltac introsType :=
   repeat (
       match goal with
       | |- forall (_ : Type), _ =>
@@ -197,7 +197,7 @@ Local Ltac introsType :=
 
 (* This tactic is able to prove the statements of helper lemmas for [begin
    procrastination], for any arity. *)
-Local Ltac prove_begin_procrastination_helper :=
+Ltac prove_begin_procrastination_helper :=
   introsType;
   let H := fresh in
   intros ? ? ? H;
@@ -253,7 +253,7 @@ Proof. prove_begin_procrastination_helper. Qed.
    When P is of type Type, the last hypothesis is instead of the form
      sigT (fun a => sigT (fun b => ... sig (fun z => facts_closed a b .. z)))
 *)
-Local Ltac mk_begin_procrastination_helper_aux n G Pty mk_exists :=
+Ltac mk_begin_procrastination_helper_aux n G Pty mk_exists :=
   transparent_assert G Type;
   [ mk_forall Type Type n ltac:(fun L =>
       let g_ty := fresh "g_ty" in
@@ -284,11 +284,11 @@ Local Ltac mk_begin_procrastination_helper_aux n G Pty mk_exists :=
     )
   | simpl in G].
 
-Local Ltac mk_begin_procrastination_helper_Type n G :=
+Ltac mk_begin_procrastination_helper_Type n G :=
   mk_begin_procrastination_helper_aux n G Type
     ltac:(fun n cont => mk_sigT_sig n Type cont).
 
-Local Ltac mk_begin_procrastination_helper_Prop n G :=
+Ltac mk_begin_procrastination_helper_Prop n G :=
   mk_begin_procrastination_helper_aux n G Prop
     ltac:(fun n cont => mk_exists n Prop cont).
 
@@ -345,7 +345,7 @@ Abort.
 *)
 
 (* Tactic that proves the lemma above for any arity. *)
-Local Ltac prove_end_procrastination_helper :=
+Ltac prove_end_procrastination_helper :=
   introsType;
   let P1 := fresh in
   let P2 := fresh in
@@ -383,7 +383,7 @@ Proof. prove_end_procrastination_helper. Qed.
    produce statements using either exists in [Prop] ([exists]) or [Type]
    ([sig]/[sigT]).
  *)
-Local Ltac mk_end_procrastination_helper_aux n G mk_exists :=
+Ltac mk_end_procrastination_helper_aux n G mk_exists :=
   transparent_assert G Type;
   [ mk_forall Type Type n ltac:(fun L =>
       let P_ty := fresh "P_ty" in
@@ -408,11 +408,11 @@ Local Ltac mk_end_procrastination_helper_aux n G mk_exists :=
    )
   | simpl in G].
 
-Local Ltac mk_end_procrastination_helper_Type n G :=
+Ltac mk_end_procrastination_helper_Type n G :=
   mk_end_procrastination_helper_aux n G
     ltac:(fun n cont => mk_sigT_sig n Type cont).
 
-Local Ltac mk_end_procrastination_helper_Prop n G :=
+Ltac mk_end_procrastination_helper_Prop n G :=
   mk_end_procrastination_helper_aux n G
     ltac:(fun n cont => mk_exists n Prop cont).
 
@@ -538,7 +538,7 @@ Abort.
    the current goal, which [procrastinate] proves -- effectively delaying its
    proof.
 *)
-Local Ltac procrastinate_aux tm ty :=
+Ltac procrastinate_aux tm ty :=
   let ty' := (eval simpl in ty) in
   lazymatch ty' with
   | and ?x ?y => procrastinate_aux (@proj2 x y tm) y
@@ -593,7 +593,7 @@ Abort.
    proposition stored in group [g].
 *)
 
-Local Ltac with_procrastination_aux tm ty tac :=
+Ltac with_procrastination_aux tm ty tac :=
   lazymatch ty with
   | and ?x ?y =>
     tac (@proj1 x y tm);
@@ -673,7 +673,7 @@ Tactic Notation "already" "procrastinated" ":" uconstr(H) :=
 
 (* [end procrastination] *)
 
-Local Ltac introv_rec :=
+Ltac introv_rec :=
   lazymatch goal with
   | |- (?P -> ?Q) => idtac
   | |- (forall _, _) => intro; introv_rec
@@ -681,7 +681,7 @@ Local Ltac introv_rec :=
   end.
 
 (* (A /\ B /\ C /\ D) -> (A /\ B /\ C) *)
-Local Ltac ands_remove_last ty :=
+Ltac ands_remove_last ty :=
   lazymatch ty with
   | and ?x ?y =>
     lazymatch y with
@@ -692,7 +692,7 @@ Local Ltac ands_remove_last ty :=
     end
   end.
 
-Local Ltac cleanup_conj_goal_aux tm ty :=
+Ltac cleanup_conj_goal_aux tm ty :=
   lazymatch ty with
   | and ?x ?y =>
     split; [apply (@proj1 x y tm) | cleanup_conj_goal_aux (@proj2 x y tm) y]
