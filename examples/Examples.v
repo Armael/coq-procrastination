@@ -31,6 +31,16 @@ Goal True.
   exists 0, 0, 0. reflexivity.
 Qed.
 
+(* Variants of the tactics named after "defer" (hence a bit easier to type) are
+   also available.
+*)
+Goal True.
+  begin deferring assuming a b c.
+  defer: (a + b = c). exact I.
+  end deferring.
+  exists 0, 0, 0. reflexivity.
+Qed.
+
 Lemma dup : forall P, P -> P -> P. auto. Qed.
 
 Goal exists (x: nat), x >= 2 /\ x <= 5 /\ x >= 1.
@@ -49,12 +59,12 @@ Goal exists (x: nat), x >= 2 /\ x <= 5 /\ x >= 1.
       Fail omega.
 
       apply dup.
-      (* [with procrastination do ...] iterates on already procrastinated subgoals *)
-      { with procrastination do (fun H => generalize H). omega. }
+      (* [with procrastinated do ...] iterates on already procrastinated subgoals *)
+      { with procrastinated do (fun H => generalize H). omega. }
 
       apply dup.
-      (* [with procrastination] adds the procrastinated facts to the context *)
-      { with procrastination. omega. }
+      (* [with procrastinated] adds the procrastinated facts to the context *)
+      { with procrastinated. omega. }
 
       (* finally, [already procrastinated: H] adds H if it has already been
          procrastinated. *)
