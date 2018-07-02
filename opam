@@ -3,9 +3,9 @@ maintainer: "armael.gueneau@inria.fr"
 authors: [
   "Armaël Guéneau <armael.gueneau@inria.fr>"
 ]
-homepage: "https://gitlab.inria.fr/agueneau/coq-procrastination"
-dev-repo: "https://gitlab.inria.fr/agueneau/coq-procrastination.git"
-bug-reports: "https://gitlab.inria.fr/agueneau/coq-procrastination/issues"
+homepage: "https://github.com/Armael/coq-procrastination"
+dev-repo: "https://github.com/Armael/coq-procrastination.git"
+bug-reports: "https://github.com/Armael/coq-procrastination/issues"
 license: "LGPL"
 build: [
   [make "-j%{jobs}%"]
