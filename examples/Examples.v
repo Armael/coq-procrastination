@@ -6,7 +6,6 @@ Goal True.
 
   assert (a <= b + 1). procrastinate.
   assert (b = c + 2). procrastinate.
-  simpl in g.
   exact I.
 
   (* [end procrastination] gives back the subgoals that have been
@@ -34,7 +33,7 @@ Goal True.
   begin procrastination group g assuming a b c.
   (* [procrastinate] chooses by default the last group of the context. *)
   assert (a = b) by procrastinate.
-  assert (b = c) by (procrastinate group g). simpl in g.
+  assert (b = c) by (procrastinate group g).
   exact I.
 
   end procrastination.
@@ -125,17 +124,17 @@ Proof.
   repeat split.
   { simpl. procrastinate. }
   { intros x y ?. repeat (destruct zerop); try omega.
-    - enough (c <= b) by lia. simpl in g. procrastinate.
+    - enough (c <= b) by lia. procrastinate.
     - pose proof (Nat.log2_le_mono x y). clear g; nia. }
   { intros n Hn.
     destruct (zerop n) as [|_]; [ exfalso; omega |].
     destruct (zerop (n / 2)) as [E|].
     - assert (n = 1). { rewrite Nat.div_small_iff in E; omega. }
       subst n. change (log2 1) with 0. rewrite Nat.mul_0_r, Nat.add_0_l.
-      simpl in g. procrastinate.
+      procrastinate.
     - assert (2 <= n). { rewrite (Nat.div_mod n 2); omega. }
       rewrite <-(log2_step n) by auto. rewrite Nat.mul_add_distr_l.
-      enough (2 <= a) by omega. simpl in g. procrastinate. }
+      enough (2 <= a) by omega. procrastinate. }
   end procrastination.
   eomega.
 Qed.
@@ -150,12 +149,12 @@ Proof.
   destruct (zerop n) as [|H].
   { subst n. simpl. procrastinate. }
   { rewrite max_l; swap 1 2.
-    { simpl in g. procrastinate M: (monotonic f). apply M.
+    { procrastinate M: (monotonic f). apply M.
       rewrite (Nat.div_mod n 2) at 1; [| omega].
       pose proof (Nat.mod_upper_bound n 2); omega. }
 
     { rewrite Nat.add_assoc. change (1+1) with 2.
-      simpl in g. revert n H. procrastinate. } }
+      revert n H. procrastinate. } }
   end procrastination.
 
   apply solve_cost_ineqs_clean.
