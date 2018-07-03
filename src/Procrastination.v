@@ -8,6 +8,9 @@
 (* already procrastinated [group g]                                           *)
 (* already procrastinated [intropat] : H [group g]                            *)
 (* with procrastinated [group g] [do cont]                                    *)
+(*                                                                            *)
+(* + variants replacing "procrastinate" with "defer", "procrastination" with  *)
+(*   "deferring" and "procrastinated" with "deferred".                        *)
 (******************************************************************************)
 
 (* The comments below describe the various tricks used for implementing the
