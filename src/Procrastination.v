@@ -121,6 +121,66 @@ Inductive Boxer :=
 | boxer : forall A : Type, A -> Boxer.
 Arguments boxer : clear implicits.
 
+(* It is useful for user-friendliness to carry around the user-provided names
+   (given with ...assuming a b c). However, Ltac does not have proper
+   data-structures that could be used to carry around a list of identifiers.
+
+  We use the following trick as a workaround: given identifiers a, b, c, one can
+  craft the following coq term: (fun a b c : unit => tt). Amusingly, this will
+  be pretty-printed by coq as (fun _ _ _ => tt), but the information about the
+  user names is still kept around. Then, one can match on this coq term to
+  recover the names:
+
+  match constr:(fun a b c : unit => tt) with
+  | (fun x => _) =>
+    idtac x
+  end
+
+  will print 'a', for example. Then one can apply a
+  "list-of-identifiers-as-a-coq-term" to tt to get its tail, while the base case
+  is having tt.
+*)
+
+(* Computes the number of identifiers, ie the "length of the list" *)
+Ltac ids_nb ids :=
+  lazymatch ids with
+  | tt => constr:(O)
+  | (fun x => _) =>
+    let ids' := eval cbv beta in (ids tt) in
+    let n := ids_nb ids' in
+    constr:(S n)
+  end.
+
+Ltac iter_idents ids tac :=
+  lazymatch ids with
+  | tt => idtac
+  | (fun x => _) =>
+    tac x;
+    iter_idents ltac:(eval cbv beta in (ids tt)) tac
+  end.
+
+Ltac rev_ids_loop ids ids_rev :=
+  lazymatch ids with
+  | tt => ids_rev
+  | (fun x => _) =>
+    let ids' := eval cbv beta in (ids tt) in
+    rev_ids_loop ids' (fun x : unit => ids_rev)
+  end.
+
+Ltac rev_ids ids :=
+  rev_ids_loop ids tt.
+
+(* For debugging purposes *)
+Ltac print_ids ids :=
+  lazymatch ids with
+  | tt => idtac
+  | (fun x => _) =>
+    let ids' := eval cbv beta in (ids tt) in
+    idtac x;
+    print_ids ids'
+  end.
+
+
 (* [mk_forall varty goalty n cont], called on a goal of type [goalty] (e.g.
    [Type] or [Prop]), refines its proof term to be [forall x_1 ... x_n, _],
    where all [x_i] have type [varty].
@@ -299,15 +359,6 @@ Ltac mk_begin_procrastination_helper_aux n G Pty mk_exists :=
     )
   | simpl in G].
 
-Ltac ids_nb ids :=
-  lazymatch ids with
-  | tt => constr:(O)
-  | (fun x => _) =>
-    let ids' := eval cbv beta in (ids tt) in
-    let n := ids_nb ids' in
-    constr:(S n)
-  end.
-
 Ltac mk_begin_procrastination_helper_Type ids G :=
   let n := ids_nb ids in
   mk_begin_procrastination_helper_aux n G Type
@@ -479,19 +530,38 @@ End MkHelperLemmas.
    If [group g] is not specified, a fresh named is used.
 *)
 
-Ltac intros_with_idents ids :=
+Ltac specialize_helper_types H ids :=
+  MkHelperLemmas.iter_idents ids ltac:(fun _ =>
+    let e := fresh in
+    evar (e : Type);
+    specialize (H e);
+    subst e
+  ).
+
+Ltac mkrefine_group ids :=
   lazymatch ids with
-  | tt => idtac
+  | tt => uconstr:(_)
   | (fun x => _) =>
-    intro x;
-    intros_with_idents ltac:(eval cbv beta in (ids tt))
+    let ids' := eval cbv beta in (ids tt) in
+    let ret := mkrefine_group ids' in
+    uconstr:(fun x => ret)
   end.
+
+Ltac specialize_helper_group H ids :=
+  let group_uconstr := mkrefine_group ids in
+  let g := fresh in
+  refine (let g := group_uconstr in _);
+  specialize (H g);
+  subst g.
 
 Ltac begin_procrastination_core g ids :=
   MkHelperLemmas.mk_begin_procrastination_helper ids;
   let H := fresh in
-  intro H; eapply H; clear H;
-  [ intros_with_idents ids; intro g | ].
+  intro H;
+  specialize_helper_types H ids;
+  specialize_helper_group H ids;
+  eapply H; clear H;
+  [ MkHelperLemmas.iter_idents ids ltac:(fun x => intro x); intro g |].
 
 (* Unfortunately, despite the fact that our core tactic
    [begin_procrastination_core] works for any arity, we have no choice but
@@ -633,6 +703,10 @@ Tactic Notation "begin" "deferring"
 
 (* Test *)
 Goal True.
+  begin procrastination group foo assuming a b.
+Abort.
+
+Goal nat.
   begin procrastination group foo assuming a b.
 Abort.
 
@@ -915,32 +989,11 @@ Ltac collect_exists_ids_loop G ids :=
 Ltac collect_exists_ids g :=
   collect_exists_ids_loop (fun (_:unit) => g) tt.
 
-Ltac rev_ids_loop ids ids_rev :=
-  lazymatch ids with
-  | tt => ids_rev
-  | (fun x => _) =>
-    let ids' := eval cbv beta in (ids tt) in
-    rev_ids_loop ids' (fun x : unit => ids_rev)
-  end.
-
-Ltac rev_ids ids :=
-  rev_ids_loop ids tt.
-
-(* For debugging purposes *)
-Ltac print_ids ids :=
-  lazymatch ids with
-  | tt => idtac
-  | (fun x => _) =>
-    let ids' := eval cbv beta in (ids tt) in
-    idtac x;
-    print_ids ids'
-  end.
-
 (* Test for [collect_exists_ids and rev_ids] *)
 Goal Marker.end_procrastination (exists a b c, a + b = c).
   match goal with |- Marker.end_procrastination ?g =>
     let ids := collect_exists_ids g in
-    let ids_rev := rev_ids ids in
+    let ids_rev := MkHelperLemmas.rev_ids ids in
     (* print_ids ids_rev *) (* prints: a b c *)
     idtac
   end.
@@ -950,7 +1003,7 @@ Ltac end_procrastination_core :=
   match goal with
   |- Marker.end_procrastination ?g =>
     let ids := collect_exists_ids g in
-    let idsr := rev_ids ids in
+    let idsr := MkHelperLemmas.rev_ids ids in
     MkHelperLemmas.mk_end_procrastination_helper idsr;
     let H := fresh in
     intro H; eapply H; clear H;
