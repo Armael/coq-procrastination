@@ -129,7 +129,7 @@ Ltac mk_forall varty goalty n cont :=
   lazymatch n with
   | O => cont (@nil Boxer)
   | S ?n' =>
-    let X := fresh "x" in
+    let X := fresh in
     refine (forall (X : varty), _ : goalty);
     mk_forall varty goalty n' ltac:(fun x => cont (cons (boxer varty X) x))
   end.
@@ -142,7 +142,7 @@ Ltac mk_forall_tys vartys goalty cont :=
   lazymatch vartys with
   | nil => cont (@nil Boxer)
   | cons (boxer _ ?ty) ?tys =>
-    let X := fresh "x" in
+    let X := fresh in
     refine (forall (X : ty), _ : goalty);
     mk_forall_tys tys goalty ltac:(fun x => cont (cons (boxer ty X) x))
   end.
@@ -168,31 +168,33 @@ Ltac mk_app f vars goalty :=
     mk_app (f x) vs goalty
   end.
 
-(* [mk_sigT_sig n goalty cont] refines the proof term to be [sigT (fun x_1 => ..
+(* [mk_sigT_sig ids goalty cont] refines the proof term to be [sigT (fun x_1 => ..
    sigT (fun x_n-1 => sig (fun x_n => _)))], then calls [cont] with the list of
    variables introduced [[x_1; .. x_n]]. *)
-Ltac mk_sigT_sig n goalty cont :=
-  lazymatch n with
-  | 0 => cont (@nil Boxer)
-  | 1 =>
-    let X := fresh "x" in
+Ltac mk_sigT_sig ids goalty cont :=
+  lazymatch ids with
+  | tt => cont (@nil Boxer)
+  | (fun x => tt) =>
+    let X := fresh x in
     refine (sig (fun X => _) : goalty);
     cont (cons (@boxer _ X) (@nil Boxer))
-  | S ?n' =>
-    let X := fresh "x" in
+  | (fun x => _) =>
+    let ids' := eval cbv beta in (ids tt) in
+    let X := fresh x in
     refine (sigT (fun X => _) : goalty);
-    mk_sigT_sig n' goalty ltac:(fun x => cont (cons (@boxer _ X) x))
+    mk_sigT_sig ids' goalty ltac:(fun x => cont (cons (@boxer _ X) x))
   end.
 
-(* Similarly, [mk_exists n goalty cont] refines the proof term to be [exists x_1
+(* Similarly, [mk_exists ids goalty cont] refines the proof term to be [exists x_1
    .. x_n, _], and calls [cont] with the list [[x_1; ..; x_n]]. *)
-Ltac mk_exists n goalty cont :=
-  lazymatch n with
-  | O => cont (@nil Boxer)
-  | S ?n' =>
-    let X := fresh "x" in
+Ltac mk_exists ids goalty cont :=
+  lazymatch ids with
+  | tt => cont (@nil Boxer)
+  | (fun x => _) =>
+    let ids' := eval cbv beta in (ids tt) in
+    let X := fresh x in
     refine (exists X, _ : goalty);
-    mk_exists n' goalty ltac:(fun x => cont (cons (@boxer _ X) x))
+    mk_exists ids' goalty ltac:(fun x => cont (cons (@boxer _ X) x))
   end.
 
 Ltac introsType :=
@@ -294,34 +296,51 @@ Ltac mk_begin_procrastination_helper_aux n G Pty mk_exists :=
     )
   | simpl in G].
 
-Ltac mk_begin_procrastination_helper_Type n G :=
-  mk_begin_procrastination_helper_aux n G Type
-    ltac:(fun n cont => mk_sigT_sig n Type cont).
+Ltac ids_nb ids :=
+  lazymatch ids with
+  | tt => constr:(O)
+  | (fun x => _) =>
+    let ids' := eval cbv beta in (ids tt) in
+    let n := ids_nb ids' in
+    constr:(S n)
+  end.
 
-Ltac mk_begin_procrastination_helper_Prop n G :=
+Ltac mk_begin_procrastination_helper_Type ids G :=
+  let n := ids_nb ids in
+  mk_begin_procrastination_helper_aux n G Type
+    ltac:(fun n cont => mk_sigT_sig ids Type cont).
+
+Ltac mk_begin_procrastination_helper_Prop ids G :=
+  let n := ids_nb ids in
   mk_begin_procrastination_helper_aux n G Prop
-    ltac:(fun n cont => mk_exists n Prop cont).
+    ltac:(fun n cont => mk_exists ids Prop cont).
 
 (* When the goal is of type [Type], generate a statement using constructive
    exists. When it is of type [Prop], use regular exists. *)
-Ltac mk_begin_procrastination_helper n :=
+Ltac mk_begin_procrastination_helper ids :=
   let H := fresh in
   match goal with |- ?G =>
     match type of G with
-    | Prop => mk_begin_procrastination_helper_Prop n H
-    | _ => mk_begin_procrastination_helper_Type n H
+    | Prop => mk_begin_procrastination_helper_Prop ids H
+    | _ => mk_begin_procrastination_helper_Type ids H
     end;
     cut H; subst H; [| prove_begin_procrastination_helper]
   end.
 
 (* Tests *)
-Goal True. mk_begin_procrastination_helper 0. intro H; eapply H; clear H.
+Goal True.
+  mk_begin_procrastination_helper tt.
+  intro H; eapply H; clear H.
 Abort.
 
-Goal True. mk_begin_procrastination_helper 3. intro H; eapply H; clear H.
+Goal True.
+  mk_begin_procrastination_helper (fun a b c : unit => tt).
+  intro H; eapply H; clear H.
 Abort.
 
-Goal nat. mk_begin_procrastination_helper 3. intro H; eapply H; clear H.
+Goal nat.
+  mk_begin_procrastination_helper (fun a b c : unit => tt).
+  intro H; eapply H; clear H.
 Abort.
 
 (* [end procrastination] helpers.
@@ -418,29 +437,34 @@ Ltac mk_end_procrastination_helper_aux n G mk_exists :=
    )
   | simpl in G].
 
-Ltac mk_end_procrastination_helper_Type n G :=
+Ltac mk_end_procrastination_helper_Type ids G :=
+  let n := ids_nb ids in
   mk_end_procrastination_helper_aux n G
-    ltac:(fun n cont => mk_sigT_sig n Type cont).
+    ltac:(fun n cont => mk_sigT_sig ids Type cont).
 
-Ltac mk_end_procrastination_helper_Prop n G :=
+Ltac mk_end_procrastination_helper_Prop ids G :=
+  let n := ids_nb ids in
   mk_end_procrastination_helper_aux n G
-    ltac:(fun n cont => mk_exists n Prop cont).
+    ltac:(fun n cont => mk_exists ids Prop cont).
 
 (* Dispatch [mk_exists] depending on the type of the goal *)
-Ltac mk_end_procrastination_helper n :=
+Ltac mk_end_procrastination_helper ids :=
   let H := fresh in
   match goal with |- Marker.end_procrastination ?G =>
     match type of G with
-    | Prop => mk_end_procrastination_helper_Prop n H
-    | _ => mk_end_procrastination_helper_Type n H
+    | Prop => mk_end_procrastination_helper_Prop ids H
+    | _ => mk_end_procrastination_helper_Type ids H
     end;
     cut H; subst H; [| prove_end_procrastination_helper ]
   end.
 
-Goal Marker.end_procrastination nat. mk_end_procrastination_helper 3.
+Goal Marker.end_procrastination nat.
+  mk_end_procrastination_helper (fun x y z : unit => tt).
+  intros.
 Abort.
 
-Goal Marker.end_procrastination True. mk_end_procrastination_helper 3.
+Goal Marker.end_procrastination True.
+  mk_end_procrastination_helper (fun x y z : unit => tt).
 Abort.
 
 End MkHelperLemmas.
@@ -452,11 +476,19 @@ End MkHelperLemmas.
    If [group g] is not specified, a fresh named is used.
 *)
 
-Ltac begin_procrastination_core g n intros_tac :=
-  MkHelperLemmas.mk_begin_procrastination_helper n;
+Ltac intros_with_idents ids :=
+  lazymatch ids with
+  | tt => idtac
+  | (fun x => _) =>
+    intro x;
+    intros_with_idents ltac:(eval cbv beta in (ids tt))
+  end.
+
+Ltac begin_procrastination_core g ids :=
+  MkHelperLemmas.mk_begin_procrastination_helper ids;
   let H := fresh in
   intro H; eapply H; clear H;
-  [ intros_tac tt; intro g | ].
+  [ intros_with_idents ids; intro g | ].
 
 (* Unfortunately, despite the fact that our core tactic
    [begin_procrastination_core] works for any arity, we have no choice but
@@ -468,132 +500,132 @@ Ltac begin_procrastination_core g n intros_tac :=
 
 Tactic Notation "begin" "procrastination" :=
   let g := fresh "g" in
-  begin_procrastination_core g 0 ltac:(fun tt => idtac).
+  begin_procrastination_core g tt.
 
 Tactic Notation "begin" "procrastination"
        "group" ident(g) :=
-  begin_procrastination_core g 0 ltac:(fun tt => idtac).
+  begin_procrastination_core g tt.
 
 Tactic Notation "begin" "procrastination"
        "assuming" ident(a) :=
   let g := fresh "g" in
-  begin_procrastination_core g 1 ltac:(fun tt => intros a).
+  begin_procrastination_core g (fun a : unit => tt).
 
 Tactic Notation "begin" "procrastination"
        "group" ident(g)
        "assuming" ident(a) :=
-  begin_procrastination_core g 1 ltac:(fun tt => intros a).
+  begin_procrastination_core g (fun a : unit => tt).
 
 Tactic Notation "begin" "procrastination"
        "assuming" ident(a) ident(b) :=
   let g := fresh "g" in
-  begin_procrastination_core g 2 ltac:(fun tt => intros a b).
+  begin_procrastination_core g (fun a b : unit => tt).
 
 Tactic Notation "begin" "procrastination"
        "group" ident(g)
        "assuming" ident(a) ident(b) :=
-  begin_procrastination_core g 2 ltac:(fun tt => intros a b).
+  begin_procrastination_core g (fun a b : unit => tt).
 
 Tactic Notation "begin" "procrastination"
        "assuming" ident(a) ident(b) ident(c) :=
   let g := fresh "g" in
-  begin_procrastination_core g 3 ltac:(fun tt => intros a b c).
+  begin_procrastination_core g (fun a b c : unit => tt).
 
 Tactic Notation "begin" "procrastination"
        "group" ident(g)
        "assuming" ident(a) ident(b) ident(c) :=
-  begin_procrastination_core g 3 ltac:(fun tt => intros a b c).
+  begin_procrastination_core g (fun a b c : unit => tt).
 
 Tactic Notation "begin" "procrastination"
        "assuming" ident(a) ident(b) ident(c) ident(d) :=
   let g := fresh "g" in
-  begin_procrastination_core g 4 ltac:(fun tt => intros a b c d).
+  begin_procrastination_core g (fun a b c d : unit => tt).
 
 Tactic Notation "begin" "procrastination"
        "group" ident(g)
        "assuming" ident(a) ident(b) ident(c) ident(d) :=
-  begin_procrastination_core g 4 ltac:(fun tt => intros a b c d).
+  begin_procrastination_core g (fun a b c d : unit => tt).
 
 Tactic Notation "begin" "procrastination"
        "assuming" ident(a) ident(b) ident(c) ident(d) ident(e) :=
   let g := fresh "g" in
-  begin_procrastination_core g 5 ltac:(fun tt => intros a b c d e).
+  begin_procrastination_core g (fun a b c d e : unit => tt).
 
 Tactic Notation "begin" "procrastination"
        "group" ident(g)
        "assuming" ident(a) ident(b) ident(c) ident(d) ident(e) :=
-  begin_procrastination_core g 5 ltac:(fun tt => intros a b c d e).
+  begin_procrastination_core g (fun a b c d e : unit => tt).
 
 (** "Defer" variants *)
 
 Tactic Notation "begin" "deferring" :=
   let g := fresh "g" in
-  begin_procrastination_core g 0 ltac:(fun tt => idtac);
+  begin_procrastination_core g ltac:(fun tt => idtac);
   [| rewrite Marker.end_procrastination_eq_end_deferring ].
 
 Tactic Notation "begin" "deferring"
        "group" ident(g) :=
-  begin_procrastination_core g 0 ltac:(fun tt => idtac);
+  begin_procrastination_core g ltac:(fun tt => idtac);
   [| rewrite Marker.end_procrastination_eq_end_deferring ].
 
 Tactic Notation "begin" "deferring"
        "assuming" ident(a) :=
   let g := fresh "g" in
-  begin_procrastination_core g 1 ltac:(fun tt => intros a);
+  begin_procrastination_core g (fun a : unit => tt);
   [| rewrite Marker.end_procrastination_eq_end_deferring ].
 
 Tactic Notation "begin" "deferring"
        "group" ident(g)
        "assuming" ident(a) :=
-  begin_procrastination_core g 1 ltac:(fun tt => intros a);
+  begin_procrastination_core g (fun a : unit => tt);
   [| rewrite Marker.end_procrastination_eq_end_deferring ].
 
 Tactic Notation "begin" "deferring"
        "assuming" ident(a) ident(b) :=
   let g := fresh "g" in
-  begin_procrastination_core g 2 ltac:(fun tt => intros a b);
+  begin_procrastination_core g (fun a b : unit => tt);
   [| rewrite Marker.end_procrastination_eq_end_deferring ].
 
 Tactic Notation "begin" "deferring"
        "group" ident(g)
        "assuming" ident(a) ident(b) :=
-  begin_procrastination_core g 2 ltac:(fun tt => intros a b);
+  begin_procrastination_core g (fun a b : unit => tt);
   [| rewrite Marker.end_procrastination_eq_end_deferring ].
 
 Tactic Notation "begin" "deferring"
        "assuming" ident(a) ident(b) ident(c) :=
   let g := fresh "g" in
-  begin_procrastination_core g 3 ltac:(fun tt => intros a b c);
+  begin_procrastination_core g (fun a b c : unit => tt);
   [| rewrite Marker.end_procrastination_eq_end_deferring ].
 
 Tactic Notation "begin" "deferring"
        "group" ident(g)
        "assuming" ident(a) ident(b) ident(c) :=
-  begin_procrastination_core g 3 ltac:(fun tt => intros a b c);
+  begin_procrastination_core g (fun a b c : unit => tt);
   [| rewrite Marker.end_procrastination_eq_end_deferring ].
 
 Tactic Notation "begin" "deferring"
        "assuming" ident(a) ident(b) ident(c) ident(d) :=
   let g := fresh "g" in
-  begin_procrastination_core g 4 ltac:(fun tt => intros a b c d);
+  begin_procrastination_core g (fun a b c d : unit => tt);
   [| rewrite Marker.end_procrastination_eq_end_deferring ].
 
 Tactic Notation "begin" "deferring"
        "group" ident(g)
        "assuming" ident(a) ident(b) ident(c) ident(d) :=
-  begin_procrastination_core g 4 ltac:(fun tt => intros a b c d);
+  begin_procrastination_core g (fun a b c d : unit => tt);
   [| rewrite Marker.end_procrastination_eq_end_deferring ].
 
 Tactic Notation "begin" "deferring"
        "assuming" ident(a) ident(b) ident(c) ident(d) ident(e) :=
   let g := fresh "g" in
-  begin_procrastination_core g 5 ltac:(fun tt => intros a b c d e);
+  begin_procrastination_core g (fun a b c d e : unit => tt);
   [| rewrite Marker.end_procrastination_eq_end_deferring ].
 
 Tactic Notation "begin" "deferring"
        "group" ident(g)
        "assuming" ident(a) ident(b) ident(c) ident(d) ident(e) :=
-  begin_procrastination_core g 5 ltac:(fun tt => intros a b c d e);
+  begin_procrastination_core g (fun a b c d e : unit => tt);
   [| rewrite Marker.end_procrastination_eq_end_deferring ].
 
 (* Test *)
@@ -863,36 +895,60 @@ Ltac cleanup_conj_goal_core :=
     cleanup_conj_goal_aux H_P_clean P_clean
   end.
 
-(* A tactic to count the number of exists in the goal. This uses the neat trick
-   provided in the comment section of
+(* A tactic to collect the names of the "exists" in from of the goal. This is
+   using the neat trick provided in the comment section of
    http://gallium.inria.fr/blog/how-to-quantify-quantifiers-an-ltac-puzzle/ (!)
-   which is apparently inspired by Adam Chlipala's book.
-*)
+   which is apparently inspired by Adam Chlipala's book. *)
 
-Ltac count_exists_loop G n :=
+Ltac collect_exists_ids_loop G ids :=
   lazymatch G with
   | (fun g => exists x, @?body g x) =>
-    count_exists_loop
-      ltac:(eval cbv beta in (fun g => body (fst g) (snd g))) (S n)
-  | _ => constr:(n)
+    collect_exists_ids_loop
+      ltac:(eval cbn beta in (fun g => body (fst g) (snd g)))
+      constr:(fun (x : unit) => ids)
+  | _ => constr:(ids)
   end.
 
-Ltac count_exists g :=
-  count_exists_loop (fun (_:unit) => g) O.
+Ltac collect_exists_ids g :=
+  collect_exists_ids_loop (fun (_:unit) => g) tt.
 
-(* Test for [count_exists] *)
+Ltac rev_ids_loop ids ids_rev :=
+  lazymatch ids with
+  | tt => ids_rev
+  | (fun x => _) =>
+    let ids' := eval cbv beta in (ids tt) in
+    rev_ids_loop ids' (fun x : unit => ids_rev)
+  end.
+
+Ltac rev_ids ids :=
+  rev_ids_loop ids tt.
+
+(* For debugging purposes *)
+Ltac print_ids ids :=
+  lazymatch ids with
+  | tt => idtac
+  | (fun x => _) =>
+    let ids' := eval cbv beta in (ids tt) in
+    idtac x;
+    print_ids ids'
+  end.
+
+(* Test for [collect_exists_ids and rev_ids] *)
 Goal Marker.end_procrastination (exists a b c, a + b = c).
   match goal with |- Marker.end_procrastination ?g =>
-    let n := count_exists g in
-    assert (n = 3) by reflexivity
+    let ids := collect_exists_ids g in
+    let ids_rev := rev_ids ids in
+    (* print_ids ids_rev *) (* prints: a b c *)
+    idtac
   end.
 Abort.
 
 Ltac end_procrastination_core :=
   match goal with
   |- Marker.end_procrastination ?g =>
-    let n := count_exists g in
-    MkHelperLemmas.mk_end_procrastination_helper n;
+    let ids := collect_exists_ids g in
+    let idsr := rev_ids ids in
+    MkHelperLemmas.mk_end_procrastination_helper idsr;
     let H := fresh in
     intro H; eapply H; clear H;
     [ introv_rec; cleanup_conj_goal_core | hnf ]

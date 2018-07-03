@@ -1,3 +1,5 @@
+Module Implem1.
+
 (* A set of tactics to count the number of exists in the goal. This requires
    crazy tricks, but surprisingly, works. *)
 Local Ltac count_exists_loop H k :=
@@ -43,3 +45,26 @@ Goal exists a b c, a + b = c.
     count_exists g ltac:(fun n => assert (n = 3) by reflexivity)
   end.
 Abort.
+
+End Implem1.
+
+(*************************)
+
+Module Implem2.
+
+(* This uses the neat trick provided in the comment section of
+   http://gallium.inria.fr/blog/how-to-quantify-quantifiers-an-ltac-puzzle/ (!)
+   which is apparently inspired by Adam Chlipala's book. *)
+
+Ltac count_exists_loop G n :=
+  lazymatch G with
+  | (fun g => exists x, @?body g x) =>
+    count_exists_loop
+      ltac:(eval cbv beta in (fun g => body (fst g) (snd g))) (S n)
+  | _ => constr:(n)
+  end.
+
+Ltac count_exists g :=
+  count_exists_loop (fun (_:unit) => g) O.
+
+End Implem2.
