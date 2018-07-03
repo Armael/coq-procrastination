@@ -2,33 +2,40 @@ Require Import Procrastination.Procrastination.
 Require Import Nat Arith Omega Psatz Eomega.
 
 Goal True.
-  begin procrastination group g.
+  begin procrastination assuming a b c.
 
-  assert (H1 : 1 + 1 = 2) by (procrastinate group g).
-  assert (H2 : 1 + 2 = 3) by (procrastinate group g).
-  (* [procrastinate H: foo group g] is a shorthand for
-     [assert (H: foo) by (procrastinate group g)] *)
-  procrastinate H3: (1 + 3 = 4) group g.
-
-  tauto.
+  assert (a <= b + 1). procrastinate.
+  assert (b = c + 2). procrastinate.
+  simpl in g.
+  exact I.
 
   (* [end procrastination] gives back the subgoals that have been
      procrastinated. *)
   end procrastination.
-
-  repeat split; reflexivity.
+  exists 0, 2, 0. omega.
 Qed.
 
 Goal True.
-  (* It's not mandatory to explicitly specify the group: the [group g] part can
-     be omitted. *)
-  begin procrastination assuming a b c.
+  begin procrastination.
+  assert (H1: 1 + 1 = 2) by procrastinate.
+  assert (H2: 1 + 2 = 3) by procrastinate.
+  (* [procrastinate H: foo group g] is a shorthand for
+     [assert (H: foo) by (procrastinate group g)] *)
+  procrastinate H3: (1 + 3 = 4).
+
+  tauto.
+
+Goal True.
+  (* It's also possible to explicitly name and refer to the "procrastination
+     group". *)
+  begin procrastination group g assuming a b c.
   (* [procrastinate] chooses by default the last group of the context. *)
-  assert (a + b = c) by procrastinate. simpl in g.
+  assert (a = b) by procrastinate.
+  assert (b = c) by (procrastinate group g). simpl in g.
   exact I.
 
   end procrastination.
-  exists 0, 0, 0. reflexivity.
+  exists 0, 0, 0. omega.
 Qed.
 
 (* Variants of the tactics named after "defer" (hence a bit easier to type) are
