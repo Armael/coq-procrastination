@@ -159,17 +159,6 @@ Ltac iter_idents ids tac :=
     iter_idents ltac:(eval cbv beta in (ids tt)) tac
   end.
 
-Ltac rev_ids_loop ids ids_rev :=
-  lazymatch ids with
-  | tt => ids_rev
-  | (fun x => _) =>
-    let ids' := eval cbv beta in (ids tt) in
-    rev_ids_loop ids' (fun x : unit => ids_rev)
-  end.
-
-Ltac rev_ids ids :=
-  rev_ids_loop ids tt.
-
 (* For debugging purposes *)
 Ltac print_ids ids :=
   lazymatch ids with
@@ -982,19 +971,19 @@ Ltac collect_exists_ids_loop G ids :=
   | (fun g => exists x, @?body g x) =>
     let G' := constr:(fun (z : _ * _) => body (fst z) (snd z)) in
     let G' := eval cbn beta in G' in
-    collect_exists_ids_loop G' constr:(fun (x : unit) => ids)
+    let ids' := collect_exists_ids_loop G' ids in
+    constr:(fun (x : unit) => ids')
   | _ => constr:(ids)
   end.
 
 Ltac collect_exists_ids g :=
   collect_exists_ids_loop (fun (_:unit) => g) tt.
 
-(* Test for [collect_exists_ids and rev_ids] *)
+(* Test for [collect_exists_ids] *)
 Goal Marker.end_procrastination (exists a b c, a + b = c).
   match goal with |- Marker.end_procrastination ?g =>
     let ids := collect_exists_ids g in
-    let ids_rev := MkHelperLemmas.rev_ids ids in
-    (* print_ids ids_rev *) (* prints: a b c *)
+    (* MkHelperLemmas.print_ids ids *) (* prints: a b c *)
     idtac
   end.
 Abort.
@@ -1003,8 +992,7 @@ Ltac end_procrastination_core :=
   match goal with
   |- Marker.end_procrastination ?g =>
     let ids := collect_exists_ids g in
-    let idsr := MkHelperLemmas.rev_ids ids in
-    MkHelperLemmas.mk_end_procrastination_helper idsr;
+    MkHelperLemmas.mk_end_procrastination_helper ids;
     let H := fresh in
     intro H; eapply H; clear H;
     [ introv_rec; cleanup_conj_goal_core | hnf ]
