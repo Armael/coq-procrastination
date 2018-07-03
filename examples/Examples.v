@@ -24,6 +24,9 @@ Goal True.
   procrastinate H3: (1 + 3 = 4).
 
   tauto.
+  end procrastination.
+  repeat split; reflexivity.
+Qed.
 
 Goal True.
   (* It's also possible to explicitly name and refer to the "procrastination
