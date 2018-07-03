@@ -903,9 +903,9 @@ Ltac cleanup_conj_goal_core :=
 Ltac collect_exists_ids_loop G ids :=
   lazymatch G with
   | (fun g => exists x, @?body g x) =>
-    collect_exists_ids_loop
-      ltac:(eval cbn beta in (fun g => body (fst g) (snd g)))
-      constr:(fun (x : unit) => ids)
+    let G' := constr:(fun (z : _ * _) => body (fst z) (snd z)) in
+    let G' := eval cbn beta in G' in
+    collect_exists_ids_loop G' constr:(fun (x : unit) => ids)
   | _ => constr:(ids)
   end.
 
