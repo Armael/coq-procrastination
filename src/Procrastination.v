@@ -1,16 +1,15 @@
 (******************************************************************************)
 (* Summary of the tactics exported by this file:                              *)
 (*                                                                            *)
-(* begin procrastination [group g] [assuming a b...]                          *)
-(* procrastinate [group g]                                                    *)
-(* procrastinate [intropat] : H [group g]                                     *)
-(* end procrastination                                                        *)
-(* already procrastinated [group g]                                           *)
-(* already procrastinated [intropat] : H [group g]                            *)
-(* with procrastinated [group g] [do cont]                                    *)
+(* begin defer [assuming a b...] [in g]                                       *)
+(* defer [in g]                                                               *)
+(* defer [H] : E [in g]                                                       *)
+(* end defer                                                                  *)
 (*                                                                            *)
-(* + variants replacing "procrastinate" with "defer", "procrastination" with  *)
-(*   "deferring" and "procrastinated" with "deferred".                        *)
+(* deferred [in g]                                                            *)
+(* deferred [H] : E [in g]                                                    *)
+(*                                                                            *)
+(* deferred exploit tac [in g]                                                *)
 (******************************************************************************)
 
 (* The comments below describe the various tricks used for implementing the
@@ -28,16 +27,8 @@ Module Marker.
 (* This marker is used in combination with a notation (see the end of the file),
    in order to hide the exact expression of a subgoal, and to indicate that
    faced with this subgoal, the user always has to call the
-   [end procrastination] tactic. *)
-Definition end_procrastination (P : Type) := P.
-Definition end_deferring (P : Type) := P.
-
-(* This is used for pretty-printing purposes, in order to rewrite a "end
-   procrastination" marker into a "end deferring" marker (which is
-   pretty-printed differently) if the user is using the "defer" aliases... *)
-Lemma end_procrastination_eq_end_deferring : forall P,
-  end_procrastination P = end_deferring P.
-Proof. reflexivity. Qed.
+   [end defer] tactic. *)
+Definition end_defer (P : Type) := P.
 
 (* This marker is used to keep track of "group" assumptions in the context
    (introduced by [begin procrastination]). This is useful so that tactics can
@@ -53,7 +44,7 @@ Ltac find_group :=
 End Marker.
 
 
-(* A very simple implementation of [begin procrastination] could be as follows:
+(* A very simple implementation of [begin defer] could be as follows:
 
    ```
    Lemma L0 : forall Goal group,
@@ -61,17 +52,16 @@ End Marker.
      group ->
      Goal.
 
-   Ltac begin_procrastination := eapply L0.
+   Ltac begin_defer := eapply L0.
    ```
 
    By using [eapply L0], [group] is introduced as an evar. Then, in the first
-   subgoal [group -> Goal], [procrastinate] can be used to discharge
-   propositions to procrastinate, by raffining the [group] evar (which is of
-   type [Prop]). Then, in the second subgoal, one has to prove the propositions
-   collected in [group].
+   subgoal [group -> Goal], [defer] can be used to discharge propositions to
+   defer, by raffining the [group] evar (which is of type [Prop]). Then, in the
+   second subgoal, one has to prove the propositions collected in [group].
 
 
-   Similarly, [begin procrastination assuming a] could be implemented as:
+   Similarly, [begin defer assuming a] could be implemented as:
 
    ```
    Lemma L1 : forall A Goal (group : A -> Prop),
@@ -79,12 +69,12 @@ End Marker.
      (exists a, group a) ->
      Goal.
 
-   Ltac begin_procrastination_assuming_1 := eapply L1
+   Ltac begin_defer_assuming_1 := eapply L1
    ```
 
-   This allows us to procrastinate propositions that depend on some parameter
-   [a] of type [A]. However we would like to have this for an arbitrary number
-   of parameters. This is the purpose of the tactics in the module below.
+   This allows us to defer propositions that depend on some parameter [a] of
+   type [A]. However we would like to have this for an arbitrary number of
+   parameters. This is the purpose of the tactics in the module below.
 
 
    More precisely, the tactics below take an arity as parameter, and build the
@@ -95,9 +85,9 @@ End Marker.
    lemma, and construct the statement using successive applications of the
    [refine] tactic.
 
-   The same set of tricks is used to implement [end procrastination], which
-   requires generating a "clean-up" lemma, whose statement depends on the number
-   of "exists" introduced by [begin procrastination].
+   The same set of tricks is used to implement [end defer], which requires
+   generating a "clean-up" lemma, whose statement depends on the number of
+   "exists" introduced by [begin defer].
 
    We start by defining some utility tactics, that help building bits of the
    statements when following this methodology.
@@ -257,47 +247,47 @@ Ltac introsType :=
       end
     ).
 
-(* [begin procrastination] helpers *)
+(* [begin defer] helpers *)
 
 (* This tactic is able to prove the statements of helper lemmas for [begin
-   procrastination], for any arity. *)
-Ltac prove_begin_procrastination_helper :=
+   defer], for any arity. *)
+Ltac prove_begin_defer_helper :=
   introsType;
   let H := fresh in
   intros ? ? ? H;
-  unfold Marker.end_procrastination in *;
+  unfold Marker.end_defer in *;
   repeat (let x := fresh "x" in destruct H as (x & H));
   eauto.
 
 (* Tests for the tactic above. *)
 Goal forall (g : Prop) (P : Type),
     (Marker.group g -> P) ->
-    Marker.end_procrastination g ->
+    Marker.end_defer g ->
     P.
-Proof. prove_begin_procrastination_helper. Qed.
+Proof. prove_begin_defer_helper. Qed.
 
 Goal forall A (g : A -> Prop) (P : Prop),
     (forall a, Marker.group (g a) -> P) ->
-    Marker.end_procrastination (exists a, g a) ->
+    Marker.end_defer (exists a, g a) ->
     P.
-Proof. prove_begin_procrastination_helper. Qed.
+Proof. prove_begin_defer_helper. Qed.
 
 Goal forall A B (g : A -> B -> Prop) (P : Prop),
     (forall a b, Marker.group (g a b) -> P) ->
-    Marker.end_procrastination (exists a b, g a b) ->
+    Marker.end_defer (exists a b, g a b) ->
     P.
-Proof. prove_begin_procrastination_helper. Qed.
+Proof. prove_begin_defer_helper. Qed.
 
 Goal forall A B (g : A -> B -> Prop) (P : Type),
     (forall a b, Marker.group (g a b) -> P) ->
-    Marker.end_procrastination {a : A & { b | g a b } } ->
+    Marker.end_defer {a : A & { b | g a b } } ->
     P.
-Proof. prove_begin_procrastination_helper. Qed.
+Proof. prove_begin_defer_helper. Qed.
 
-(* Tactic that generates lemma statements as [begin procrastination] helpers.
+(* Tactic that generates lemma statements as [begin defer] helpers.
 
    Generates a definition G := ... . G then corresponds to a statement that can
-   be proved using [prove_begin_procrastination_helper], and is of the form:
+   be proved using [prove_begin_defer_helper], and is of the form:
 
    ```
    forall
@@ -305,7 +295,7 @@ Proof. prove_begin_procrastination_helper. Qed.
      (facts : A -> B -> .. -> Z -> Prop)
      (P: Prop),
    (forall a b .. z, Marker.group (facts a b .. z) -> P) ->
-   end_procrastination (exists a b .. z, facts a b .. z) ->
+   end_defer (exists a b .. z, facts a b .. z) ->
    P.
    ```
 
@@ -317,7 +307,7 @@ Proof. prove_begin_procrastination_helper. Qed.
    When P is of type Type, the last hypothesis is instead of the form
      sigT (fun a => sigT (fun b => ... sig (fun z => facts_closed a b .. z)))
 *)
-Ltac mk_begin_procrastination_helper_aux n G Pty mk_exists :=
+Ltac mk_begin_defer_helper_aux n G Pty mk_exists :=
   transparent_assert G Type;
   [ mk_forall Type Type n ltac:(fun L =>
       let g_ty := fresh "g_ty" in
@@ -340,7 +330,7 @@ Ltac mk_begin_procrastination_helper_aux n G Pty mk_exists :=
       | simpl in H1];
 
       let H2 := fresh "H2" in transparent_assert H2 Type;
-      [ refine (Marker.end_procrastination _ : Type);
+      [ refine (Marker.end_defer _ : Type);
         mk_exists n ltac:(fun l => mk_app g l Prop)
       | simpl in H2];
 
@@ -348,54 +338,54 @@ Ltac mk_begin_procrastination_helper_aux n G Pty mk_exists :=
     )
   | simpl in G].
 
-Ltac mk_begin_procrastination_helper_Type ids G :=
+Ltac mk_begin_defer_helper_Type ids G :=
   let n := ids_nb ids in
-  mk_begin_procrastination_helper_aux n G Type
+  mk_begin_defer_helper_aux n G Type
     ltac:(fun n cont => mk_sigT_sig ids Type cont).
 
-Ltac mk_begin_procrastination_helper_Prop ids G :=
+Ltac mk_begin_defer_helper_Prop ids G :=
   let n := ids_nb ids in
-  mk_begin_procrastination_helper_aux n G Prop
+  mk_begin_defer_helper_aux n G Prop
     ltac:(fun n cont => mk_exists ids Prop cont).
 
 (* When the goal is of type [Type], generate a statement using constructive
    exists. When it is of type [Prop], use regular exists. *)
-Ltac mk_begin_procrastination_helper ids :=
+Ltac mk_begin_defer_helper ids :=
   let H := fresh in
   match goal with |- ?G =>
     match type of G with
-    | Prop => mk_begin_procrastination_helper_Prop ids H
-    | _ => mk_begin_procrastination_helper_Type ids H
+    | Prop => mk_begin_defer_helper_Prop ids H
+    | _ => mk_begin_defer_helper_Type ids H
     end;
-    cut H; subst H; [| prove_begin_procrastination_helper]
+    cut H; subst H; [| prove_begin_defer_helper]
   end.
 
 (* Tests *)
 Goal True.
-  mk_begin_procrastination_helper tt.
+  mk_begin_defer_helper tt.
   intro H; eapply H; clear H.
 Abort.
 
 Goal True.
-  mk_begin_procrastination_helper (fun a b c : unit => tt).
+  mk_begin_defer_helper (fun a b c : unit => tt).
   intro H; eapply H; clear H.
 Abort.
 
 Goal nat.
-  mk_begin_procrastination_helper (fun a b c : unit => tt).
+  mk_begin_defer_helper (fun a b c : unit => tt).
   intro H; eapply H; clear H.
 Abort.
 
-(* [end procrastination] helpers.
+(* [end defer] helpers.
 
-   [end procrastination] is called on the second subgoal produced by [begin
-   procrastination], of the form [exists a .. z, group a .. z], where [group a
-   .. z] has been instantiated by [procrastinate] into something of the form [P1
-   /\ P2 /\ ... /\ Pn /\ ?P], where P1 .. Pn are the propositions that have been
-   procrastinated, and [?P] is the "accumulator" evar.
+   [end defer] is called on the second subgoal produced by [begin defer], of the
+   form [exists a .. z, group a .. z], where [group a .. z] has been
+   instantiated by [defer] into something of the form [P1 /\ P2 /\ ... /\ Pn /\
+   ?P], where P1 .. Pn are the propositions that have been deferred, and [?P] is
+   the "accumulator" evar.
 
-   The role of [end procrastination] is to close the goal, instantiating [?P]
-   with [True], and removing it from the goal.
+   The role of [end defer] is to close the goal, instantiating [?P] with [True],
+   and removing it from the goal.
 
    This is done by first applying a lemma of the form:
 
@@ -417,14 +407,14 @@ Abort.
 *)
 
 (* Tactic that proves the lemma above for any arity. *)
-Ltac prove_end_procrastination_helper :=
+Ltac prove_end_defer_helper :=
   introsType;
   let P1 := fresh in
   let P2 := fresh in
   let H1 := fresh in
   let H2 := fresh in
   intros P1 P2 H1 H2;
-  unfold Marker.end_procrastination in *;
+  unfold Marker.end_defer in *;
   repeat (let x := fresh "x" in destruct H2 as (x & H2); exists x);
   apply H1; auto.
 
@@ -432,30 +422,30 @@ Ltac prove_end_procrastination_helper :=
 Goal forall A (P1 P2 : A -> Prop),
   (forall a, P1 a -> P2 a) ->
   (exists a, P1 a) ->
-  Marker.end_procrastination (exists a, P2 a).
-Proof. prove_end_procrastination_helper. Qed.
+  Marker.end_defer (exists a, P2 a).
+Proof. prove_end_defer_helper. Qed.
 
 Goal forall A B (P1 P2 : A -> B -> Prop),
   (forall a b, P1 a b -> P2 a b) ->
   (exists a b, P1 a b) ->
-  Marker.end_procrastination (exists a b, P2 a b).
-Proof. prove_end_procrastination_helper. Qed.
+  Marker.end_defer (exists a b, P2 a b).
+Proof. prove_end_defer_helper. Qed.
 
 Goal forall A (P1 P2 : A -> Prop),
   (forall a, P1 a -> P2 a) ->
   { a | P1 a } ->
-  Marker.end_procrastination { a | P2 a }.
-Proof. prove_end_procrastination_helper. Qed.
+  Marker.end_defer { a | P2 a }.
+Proof. prove_end_defer_helper. Qed.
 
 (* Generates a definition G := ... . G then corresponds to a statement that can
-   be proved using [prove_begin_procrastination_helper], and is of the form
-   detailed above.
+   be proved using [prove_begin_defer_helper], and is of the form detailed
+   above.
 
    [mk_exists] is used to refine the nested "exists", allowing the tactic to
    produce statements using either exists in [Prop] ([exists]) or [Type]
    ([sig]/[sigT]).
  *)
-Ltac mk_end_procrastination_helper_aux n G mk_exists :=
+Ltac mk_end_defer_helper_aux n G mk_exists :=
   transparent_assert G Type;
   [ mk_forall Type Type n ltac:(fun L =>
       let P_ty := fresh "P_ty" in
@@ -474,49 +464,49 @@ Ltac mk_end_procrastination_helper_aux n G mk_exists :=
         )
       | simpl in H1 ];
 
-      refine (H1 -> _ -> Marker.end_procrastination _ : Type);
+      refine (H1 -> _ -> Marker.end_defer _ : Type);
       [ mk_exists n ltac:(fun l => mk_app P1 l Prop)
       | mk_exists n ltac:(fun l => mk_app P2 l Prop) ]
    )
   | simpl in G].
 
-Ltac mk_end_procrastination_helper_Type ids G :=
+Ltac mk_end_defer_helper_Type ids G :=
   let n := ids_nb ids in
-  mk_end_procrastination_helper_aux n G
+  mk_end_defer_helper_aux n G
     ltac:(fun n cont => mk_sigT_sig ids Type cont).
 
-Ltac mk_end_procrastination_helper_Prop ids G :=
+Ltac mk_end_defer_helper_Prop ids G :=
   let n := ids_nb ids in
-  mk_end_procrastination_helper_aux n G
+  mk_end_defer_helper_aux n G
     ltac:(fun n cont => mk_exists ids Prop cont).
 
 (* Dispatch [mk_exists] depending on the type of the goal *)
-Ltac mk_end_procrastination_helper ids :=
+Ltac mk_end_defer_helper ids :=
   let H := fresh in
-  match goal with |- Marker.end_procrastination ?G =>
+  match goal with |- Marker.end_defer ?G =>
     match type of G with
-    | Prop => mk_end_procrastination_helper_Prop ids H
-    | _ => mk_end_procrastination_helper_Type ids H
+    | Prop => mk_end_defer_helper_Prop ids H
+    | _ => mk_end_defer_helper_Type ids H
     end;
-    cut H; subst H; [| prove_end_procrastination_helper ]
+    cut H; subst H; [| prove_end_defer_helper ]
   end.
 
-Goal Marker.end_procrastination nat.
-  mk_end_procrastination_helper (fun x y z : unit => tt).
+Goal Marker.end_defer nat.
+  mk_end_defer_helper (fun x y z : unit => tt).
   intros.
 Abort.
 
-Goal Marker.end_procrastination True.
-  mk_end_procrastination_helper (fun x y z : unit => tt).
+Goal Marker.end_defer True.
+  mk_end_defer_helper (fun x y z : unit => tt).
 Abort.
 
 End MkHelperLemmas.
 
 (******************************************************************************)
 
-(* [begin procrastination [group g] [assuming a b...]]
+(* begin defer [assuming a b...] [in g]
 
-   If [group g] is not specified, a fresh named is used.
+   If [in g] is not specified, a fresh named is used.
 *)
 
 Ltac specialize_helper_types H ids :=
@@ -543,8 +533,8 @@ Ltac specialize_helper_group H ids :=
   specialize (H g);
   subst g.
 
-Ltac begin_procrastination_core g ids :=
-  MkHelperLemmas.mk_begin_procrastination_helper ids;
+Ltac begin_defer_core g ids :=
+  MkHelperLemmas.mk_begin_defer_helper ids;
   let H := fresh in
   intro H;
   specialize_helper_types H ids;
@@ -560,370 +550,216 @@ Ltac begin_procrastination_core g ids :=
    See e.g. https://github.com/coq/coq/pull/6081
 *)
 
-Tactic Notation "begin" "procrastination" :=
+Tactic Notation "begin" "defer" :=
   let g := fresh "g" in
-  begin_procrastination_core g tt.
+  begin_defer_core g tt.
 
-Tactic Notation "begin" "procrastination"
-       "group" ident(g) :=
-  begin_procrastination_core g tt.
+Tactic Notation "begin" "defer"
+       "in" ident(g) :=
+  begin_defer_core g tt.
 
-Tactic Notation "begin" "procrastination"
+Tactic Notation "begin" "defer"
        "assuming" ident(a) :=
   let g := fresh "g" in
-  begin_procrastination_core g (fun a : unit => tt).
+  begin_defer_core g (fun a : unit => tt).
 
-Tactic Notation "begin" "procrastination"
-       "group" ident(g)
-       "assuming" ident(a) :=
-  begin_procrastination_core g (fun a : unit => tt).
+Tactic Notation "begin" "defer"
+       "assuming" ident(a)
+       "in" ident(g) :=
+  begin_defer_core g (fun a : unit => tt).
 
-Tactic Notation "begin" "procrastination"
+Tactic Notation "begin" "defer"
        "assuming" ident(a) ident(b) :=
   let g := fresh "g" in
-  begin_procrastination_core g (fun a b : unit => tt).
+  begin_defer_core g (fun a b : unit => tt).
 
-Tactic Notation "begin" "procrastination"
-       "group" ident(g)
-       "assuming" ident(a) ident(b) :=
-  begin_procrastination_core g (fun a b : unit => tt).
+Tactic Notation "begin" "defer"
+       "assuming" ident(a) ident(b)
+       "in" ident(g) :=
+  begin_defer_core g (fun a b : unit => tt).
 
-Tactic Notation "begin" "procrastination"
+Tactic Notation "begin" "defer"
        "assuming" ident(a) ident(b) ident(c) :=
   let g := fresh "g" in
-  begin_procrastination_core g (fun a b c : unit => tt).
+  begin_defer_core g (fun a b c : unit => tt).
 
-Tactic Notation "begin" "procrastination"
-       "group" ident(g)
-       "assuming" ident(a) ident(b) ident(c) :=
-  begin_procrastination_core g (fun a b c : unit => tt).
+Tactic Notation "begin" "defer"
+       "assuming" ident(a) ident(b) ident(c)
+       "in" ident(g) :=
+  begin_defer_core g (fun a b c : unit => tt).
 
-Tactic Notation "begin" "procrastination"
+Tactic Notation "begin" "defer"
        "assuming" ident(a) ident(b) ident(c) ident(d) :=
   let g := fresh "g" in
-  begin_procrastination_core g (fun a b c d : unit => tt).
+  begin_defer_core g (fun a b c d : unit => tt).
 
-Tactic Notation "begin" "procrastination"
-       "group" ident(g)
-       "assuming" ident(a) ident(b) ident(c) ident(d) :=
-  begin_procrastination_core g (fun a b c d : unit => tt).
+Tactic Notation "begin" "defer"
+       "assuming" ident(a) ident(b) ident(c) ident(d)
+       "in" ident(g) :=
+  begin_defer_core g (fun a b c d : unit => tt).
 
-Tactic Notation "begin" "procrastination"
+Tactic Notation "begin" "defer"
        "assuming" ident(a) ident(b) ident(c) ident(d) ident(e) :=
   let g := fresh "g" in
-  begin_procrastination_core g (fun a b c d e : unit => tt).
+  begin_defer_core g (fun a b c d e : unit => tt).
 
-Tactic Notation "begin" "procrastination"
-       "group" ident(g)
-       "assuming" ident(a) ident(b) ident(c) ident(d) ident(e) :=
-  begin_procrastination_core g (fun a b c d e : unit => tt).
-
-(** "Defer" variants *)
-
-Tactic Notation "begin" "deferring" :=
-  let g := fresh "g" in
-  begin_procrastination_core g ltac:(fun tt => idtac);
-  [| rewrite Marker.end_procrastination_eq_end_deferring ].
-
-Tactic Notation "begin" "deferring"
-       "group" ident(g) :=
-  begin_procrastination_core g ltac:(fun tt => idtac);
-  [| rewrite Marker.end_procrastination_eq_end_deferring ].
-
-Tactic Notation "begin" "deferring"
-       "assuming" ident(a) :=
-  let g := fresh "g" in
-  begin_procrastination_core g (fun a : unit => tt);
-  [| rewrite Marker.end_procrastination_eq_end_deferring ].
-
-Tactic Notation "begin" "deferring"
-       "group" ident(g)
-       "assuming" ident(a) :=
-  begin_procrastination_core g (fun a : unit => tt);
-  [| rewrite Marker.end_procrastination_eq_end_deferring ].
-
-Tactic Notation "begin" "deferring"
-       "assuming" ident(a) ident(b) :=
-  let g := fresh "g" in
-  begin_procrastination_core g (fun a b : unit => tt);
-  [| rewrite Marker.end_procrastination_eq_end_deferring ].
-
-Tactic Notation "begin" "deferring"
-       "group" ident(g)
-       "assuming" ident(a) ident(b) :=
-  begin_procrastination_core g (fun a b : unit => tt);
-  [| rewrite Marker.end_procrastination_eq_end_deferring ].
-
-Tactic Notation "begin" "deferring"
-       "assuming" ident(a) ident(b) ident(c) :=
-  let g := fresh "g" in
-  begin_procrastination_core g (fun a b c : unit => tt);
-  [| rewrite Marker.end_procrastination_eq_end_deferring ].
-
-Tactic Notation "begin" "deferring"
-       "group" ident(g)
-       "assuming" ident(a) ident(b) ident(c) :=
-  begin_procrastination_core g (fun a b c : unit => tt);
-  [| rewrite Marker.end_procrastination_eq_end_deferring ].
-
-Tactic Notation "begin" "deferring"
-       "assuming" ident(a) ident(b) ident(c) ident(d) :=
-  let g := fresh "g" in
-  begin_procrastination_core g (fun a b c d : unit => tt);
-  [| rewrite Marker.end_procrastination_eq_end_deferring ].
-
-Tactic Notation "begin" "deferring"
-       "group" ident(g)
-       "assuming" ident(a) ident(b) ident(c) ident(d) :=
-  begin_procrastination_core g (fun a b c d : unit => tt);
-  [| rewrite Marker.end_procrastination_eq_end_deferring ].
-
-Tactic Notation "begin" "deferring"
-       "assuming" ident(a) ident(b) ident(c) ident(d) ident(e) :=
-  let g := fresh "g" in
-  begin_procrastination_core g (fun a b c d e : unit => tt);
-  [| rewrite Marker.end_procrastination_eq_end_deferring ].
-
-Tactic Notation "begin" "deferring"
-       "group" ident(g)
-       "assuming" ident(a) ident(b) ident(c) ident(d) ident(e) :=
-  begin_procrastination_core g (fun a b c d e : unit => tt);
-  [| rewrite Marker.end_procrastination_eq_end_deferring ].
+Tactic Notation "begin" "defer"
+       "assuming" ident(a) ident(b) ident(c) ident(d) ident(e)
+       "in" ident(g) :=
+  begin_defer_core g (fun a b c d e : unit => tt).
 
 (* Test *)
 Goal True.
-  begin procrastination group foo assuming a b.
+  begin defer assuming a b in foo.
 Abort.
 
 Goal nat.
-  begin procrastination group foo assuming a b.
+  begin defer assuming a b in foo.
 Abort.
 
-Goal True.
-  begin deferring group foo assuming a b.
-Abort.
-
-(* [procrastinate [group g]]
-
-   If the name of the group [g] is not specified, the group that has been
-   introduced last is used.
-
-   Also defines the [procrastinate [X]: H [group g]] helper tactic, which
-   asserts [H] (with optional name [X]) and procrastinates its proof in group
-   [g].
-*)
+(* defer [in g] *)
 
 (* After unfolding markers, a group is a variable [g] in the context, of type of
    the form [P1 /\ ... /\ Pk /\ ?P], where [P1 ... Pk] are the propositions that
    have been previously procrastinated.
 
-   What [procrastinate] does is instantiating [?P] with [G /\ ?P'], where [G] is
+   What [defer] does is instantiating [?P] with [G /\ ?P'], where [G] is
    the current goal, and [?P'] a newly introduced evar. The group now entails
-   the current goal, which [procrastinate] proves -- effectively delaying its
+   the current goal, which [defer] proves -- effectively delaying its
    proof.
 *)
-Ltac procrastinate_aux tm ty :=
+Ltac defer_aux tm ty :=
   let ty' := (eval simpl in ty) in
   lazymatch ty' with
-  | and ?x ?y => procrastinate_aux (@proj2 x y tm) y
+  | and ?x ?y => defer_aux (@proj2 x y tm) y
   | _ => eapply (proj1 tm)
   end.
 
-Ltac procrastinate_core group :=
+Ltac defer_core group :=
   let ty := type of group in
   let ty' := (eval unfold Marker.group in ty) in
-  procrastinate_aux group ty'.
+  defer_aux group ty'.
 
-Tactic Notation "procrastinate" "group" ident(g) :=
-  procrastinate_core g.
-
-Tactic Notation "procrastinate" :=
-  let g := Marker.find_group in
-  procrastinate group g.
-
-Tactic Notation "procrastinate" simple_intropattern(i) ":" uconstr(H) "group" ident(g) :=
-  assert H as i by procrastinate_core g.
-
-Tactic Notation "procrastinate" ":" uconstr(H) "group" ident(g) :=
-  assert H by procrastinate_core g.
-
-Tactic Notation "procrastinate" simple_intropattern(i) ":" uconstr(H) :=
-  let g := Marker.find_group in
-  procrastinate i : H group g.
-
-Tactic Notation "procrastinate" ":" uconstr(H) :=
-  let g := Marker.find_group in
-  procrastinate: H group g.
-
-(** "Defer" variants *)
-
-Tactic Notation "defer" "group" ident(g) :=
-  procrastinate_core g.
+Tactic Notation "defer" "in" ident(g) :=
+  defer_core g.
 
 Tactic Notation "defer" :=
   let g := Marker.find_group in
-  procrastinate group g.
+  defer in g.
 
-Tactic Notation "defer" simple_intropattern(i) ":" uconstr(H) "group" ident(g) :=
-  assert H as i by procrastinate_core g.
+(* defer [H] : E [in g] *)
 
-Tactic Notation "defer" ":" uconstr(H) "group" ident(g) :=
-  assert H by procrastinate_core g.
+Tactic Notation "defer" simple_intropattern(H) ":" uconstr(E) "in" ident(g) :=
+  assert E as H by defer_core g.
 
-Tactic Notation "defer" simple_intropattern(i) ":" uconstr(H) :=
+Tactic Notation "defer" ":" uconstr(E) "in" ident(g) :=
+  let H := fresh in
+  defer H : E in g;
+  revert H.
+
+Tactic Notation "defer" simple_intropattern(H) ":" uconstr(E) :=
   let g := Marker.find_group in
-  procrastinate i : H group g.
+  defer H : E in g.
 
-Tactic Notation "defer" ":" uconstr(H) :=
+Tactic Notation "defer" ":" uconstr(E) :=
   let g := Marker.find_group in
-  procrastinate: H group g.
+  defer: E in g.
 
 (* Test *)
 Goal True.
-  begin procrastination group foo.
-  begin procrastination group bar.
-  assert (1 = 1) by procrastinate. (* goes in group [bar] *)
-  procrastinate: (2 = 2). (* same result *)
-  procrastinate E: (3 = 3). (* same result, allows naming the hypothesis *)
-  assert (4 = 4) by (procrastinate group foo). (* goes in group [foo] *)
-  procrastinate [E1 E2]: (5 = 5 /\ 6 = 6) group foo. (* same result *)
+  begin defer in foo.
+  begin defer in bar.
+  assert (1 = 1) by defer. (* goes in group [bar] *)
+  defer HH: (2 = 2). (* same result *)
+  defer: (3 = 3). intros ?. (* same result, with the result on the goal *)
+  defer _: (4 = 4) in foo. (* goes in group [foo] *)
+  defer [E1 E2]: (5 = 5 /\ 6 = 6) in foo. (* same result *)
 Abort.
 
-(* [with procrastinated [group g] [do tac]]
+(* exploit deferred tac [in g] *)
 
-   If [group g] is omitted, the group that has been introduced last is used.
-
-   If [do tac] is omitted, adds to the context all propositions that have been
-   procrastinated so far.
-
-   When [do tac] is provided, with [tac] a valid tactic, calls [tac] on each
-   proposition stored in group [g].
-*)
-
-Ltac with_procrastinated_aux tm ty tac :=
+Ltac deferred_exploit_aux tm ty tac :=
   lazymatch ty with
   | and ?x ?y =>
-    tac (@proj1 x y tm);
+    try tac (@proj1 x y tm);
     tryif is_evar y then idtac
-    else with_procrastinated_aux (@proj2 x y tm) y tac
+    else deferred_exploit_aux (@proj2 x y tm) y tac
   end.
 
-Ltac with_procrastinated_core g tac :=
+Ltac deferred_exploit_core g tac :=
   let ty := type of g in
   let ty' := (eval unfold Marker.group in ty) in
-  with_procrastinated_aux g ty' tac.
+  progress (deferred_exploit_aux g ty' tac).
 
-Tactic Notation "with" "procrastinated"
-       "do" tactic(tac) :=
+Tactic Notation "deferred" "exploit" tactic(tac) "in" ident(g) :=
+  deferred_exploit_core g tac.
+
+Tactic Notation "deferred" "exploit" tactic(tac) :=
   let g := Marker.find_group in
-  with_procrastinated_core g tac.
-
-Tactic Notation "with" "procrastinated"
-       "group" ident(g)
-       "do" tactic(tac) :=
-  with_procrastinated_core g tac.
-
-Tactic Notation "with" "procrastinated" :=
-  let g := Marker.find_group in
-  with_procrastinated_core g ltac:(fun t => pose proof t).
-
-Tactic Notation "with" "procrastinated"
-       "group" ident(g) :=
-  let g := Marker.find_group in
-  with_procrastinated_core g ltac:(fun t => pose proof t).
-
-(** "Defer" variants *)
-
-Tactic Notation "with" "deferred"
-       "do" tactic(tac) :=
-  let g := Marker.find_group in
-  with_procrastinated_core g tac.
-
-Tactic Notation "with" "deferred"
-       "group" ident(g)
-       "do" tactic(tac) :=
-  with_procrastinated_core g tac.
-
-Tactic Notation "with" "deferred" :=
-  let g := Marker.find_group in
-  with_procrastinated_core g ltac:(fun t => pose proof t).
-
-Tactic Notation "with" "deferred"
-       "group" ident(g) :=
-  let g := Marker.find_group in
-  with_procrastinated_core g ltac:(fun t => pose proof t).
+  deferred exploit tac in g.
 
 (* Test *)
 Goal True.
-  begin procrastination group foo.
-  assert (1 + 1 = 2) by procrastinate.
-  assert (L: forall n, n + 0 = n) by procrastinate.
+  begin defer in foo.
+  defer ?: (1 + 1 = 2).
+  defer L: (forall n, n + 0 = n).
   clear L.
   assert (3 + 0 = 3).
-  { with procrastinated group foo do (fun H => try apply H). }
+  { deferred exploit (fun H => rewrite H).
+    reflexivity. }
 Abort.
 
-(* [already procrastinated [group g]]
-
-   If [g] is omitted, picks the group that has been introduced last.
-
-   Tries to apply one of the propositions collected in [g] to the goal.
-
-
-   Also defines the [already procrastinated [X]: H [group g]] helper tactic,
-   which asserts [H] (with optional name [X]) and proves it using [already
-   procrastinated].
+(* deferred [in g]
+   deferred [H] : E [in g]
 *)
 
-Ltac already_procrastinated_core g :=
-  progress (with procrastinated group g do (fun H => try (apply H))).
+Ltac deferred_core g :=
+  first [ solve [ deferred exploit (fun H => apply H) in g ]
+        | deferred exploit (fun H => generalize H) in g ].
 
-Tactic Notation "already" "procrastinated" "group" ident(g) :=
-  already_procrastinated_core g.
+Tactic Notation "deferred" "in" ident(g) :=
+  deferred_core g.
 
-Tactic Notation "already" "procrastinated" :=
+Tactic Notation "deferred" :=
   let g := Marker.find_group in
-  already procrastinated group g.
+  deferred in g.
 
-Tactic Notation "already" "procrastinated" simple_intropattern(i) ":" uconstr(H) "group" ident(g) :=
-  assert H as i by already procrastinated group g.
+Tactic Notation "deferred" simple_intropattern(H) ":" uconstr(E) "in" ident(g) :=
+  assert E as H; [ deferred in g |].
 
-Tactic Notation "already" "procrastinated" ":" uconstr(H) "group" ident(g) :=
-  assert H by already procrastinated group g.
+Tactic Notation "deferred" ":" uconstr(E) "in" ident(g) :=
+  let H := fresh in
+  assert E as H; [ deferred in g | revert H ].
 
-Tactic Notation "already" "procrastinated" simple_intropattern(i) ":" uconstr(H) :=
+Tactic Notation "deferred" simple_intropattern(H) ":" uconstr(E) :=
   let g := Marker.find_group in
-  already procrastinated i : H group g.
+  deferred H : E in g.
 
-Tactic Notation "already" "procrastinated" ":" uconstr(H) :=
+Tactic Notation "deferred" ":" uconstr(E) :=
   let g := Marker.find_group in
-  already procrastinated : H group g.
+  deferred : E in g.
 
-(** "Defer" variants *)
+(* Test *)
 
-Tactic Notation "already" "deferred" "group" ident(g) :=
-  already_procrastinated_core g.
+Goal True.
+  begin defer.
+  defer _: (1 + 1 = 2).
+  defer _: (1 + 2 = 3).
+  deferred. intros _ _.
+Abort.
 
-Tactic Notation "already" "deferred" :=
-  let g := Marker.find_group in
-  already procrastinated group g.
+(* Test *)
+Goal True.
+  begin defer.
+  defer _: (1 + 2 = 3).
+  defer _: (forall n, n + 0 = n).
+  deferred _: (3 + 0 = 3).
+  deferred: (forall n, n = n + 0).
+  { auto. }
+  intros ?.
+Abort.
 
-Tactic Notation "already" "deferred" simple_intropattern(i) ":" uconstr(H) "group" ident(g) :=
-  assert H as i by already procrastinated group g.
-
-Tactic Notation "already" "deferred" ":" uconstr(H) "group" ident(g) :=
-  assert H by already procrastinated group g.
-
-Tactic Notation "already" "deferred" simple_intropattern(i) ":" uconstr(H) :=
-  let g := Marker.find_group in
-  already procrastinated i : H group g.
-
-Tactic Notation "already" "deferred" ":" uconstr(H) :=
-  let g := Marker.find_group in
-  already procrastinated : H group g.
-
-
-(* [end procrastination] *)
+(* [end defer] *)
 
 Ltac introv_rec :=
   lazymatch goal with
@@ -980,65 +816,57 @@ Ltac collect_exists_ids g :=
   collect_exists_ids_loop (fun (_:unit) => g) tt.
 
 (* Test for [collect_exists_ids] *)
-Goal Marker.end_procrastination (exists a b c, a + b = c).
-  match goal with |- Marker.end_procrastination ?g =>
+Goal Marker.end_defer (exists a b c, a + b = c).
+  match goal with |- Marker.end_defer ?g =>
     let ids := collect_exists_ids g in
     (* MkHelperLemmas.print_ids ids *) (* prints: a b c *)
     idtac
   end.
 Abort.
 
-Ltac end_procrastination_core :=
+Ltac end_defer_core :=
   match goal with
-  |- Marker.end_procrastination ?g =>
+  |- Marker.end_defer ?g =>
     let ids := collect_exists_ids g in
-    MkHelperLemmas.mk_end_procrastination_helper ids;
+    MkHelperLemmas.mk_end_defer_helper ids;
     let H := fresh in
     intro H; eapply H; clear H;
     [ introv_rec; cleanup_conj_goal_core | hnf ]
   end.
 
-Tactic Notation "end" "procrastination" :=
-  end_procrastination_core.
-
-Tactic Notation "end" "deferring" :=
-  rewrite <-Marker.end_procrastination_eq_end_deferring;
-  end_procrastination_core.
+Tactic Notation "end" "defer" :=
+  end_defer_core.
 
 (* Tests *)
 Goal True.
-  begin procrastination group g.
+  begin defer in g.
 
-  assert (H1 : 1 + 1 = 2) by (procrastinate group g).
-  assert (H2 : 1 + 2 = 3) by (procrastinate group g).
-  procrastinate H3: (1 + 3 = 4) group g.
+  defer H1: (1 + 1 = 2).
+  defer H2: (1 + 2 = 3).
+  defer H3: (1 + 3 = 4) in g.
 
   tauto.
-  end procrastination.
+  end defer.
 
   repeat split; reflexivity.
 Qed.
 
 Goal True.
-  begin procrastination assuming a b c.
-  assert (a + b = c). procrastinate. simpl in g.
+  begin defer assuming a b c.
+  assert (a + b = c). defer.
   exact I.
 
-  end procrastination.
+  end defer.
 Abort.
 
 (******************************************************************************)
 
 (* Notation for markers *)
 
-(* We print this marker as [end procrastination], to informally indicate to the
-   user that such a goal should always be treated by calling the [end
-   procrastination] tactic. *)
-Notation "'end'  'procrastination'" :=
-  (Marker.end_procrastination _) (at level 0).
-
-Notation "'end'  'deferring'" :=
-  (Marker.end_deferring _) (at level 0).
+(* We print this marker as [end defer], to informally indicate to the user that
+   such a goal should always be treated by calling the [end defer] tactic. *)
+Notation "'end'  'defer'" :=
+  (Marker.end_defer _) (at level 0).
 
 Notation "'Group'  P" :=
   (Marker.group P) (at level 0).

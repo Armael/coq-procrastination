@@ -1,78 +1,52 @@
 # Tactics Reference
 
-- `begin procrastination [group g] [assuming a b...]`
+- `begin defer [assuming a b...] [in g]`
 
-  Start a "procrastination" block. If `group g` is provided, give name `g` to
+  Start a "defer" block. If `group g` is provided, give name `g` to
   the hypothesis of type `Group` introduced. If `assuming a b...` (where `a`,
   `b`, ... are one or several user-provided names) is provided, also introduce
   in the context abstract variables of the same names.
 
-- `procrastinate [group g]`
+- `defer [in g]`
 
-  Discharge the current sub-goal, deferring it for later. If `group g` is
+  Discharge the current sub-goal, deferring it for later. If `in g` is
   provided, store it in the hypothesis `g` which must be of type `Group ...`. If
-  `group g` is not provided, the tactic picks the hypothesis of type `Group ...`
+  `in g` is not provided, the tactic picks the hypothesis of type `Group ...`
   which has been introduced last (if there are several).
 
   The sub-goal being differed has to make sense in the context of the `Group` it
-  is stored in (which is the context of the `begin procrastination` that
-  introduced the `Group`). Otherwise Coq will raise an error involving the
-  context of the evar in the `Group`.
+  is stored in (which is the context of the `begin defer` that introduced the
+  `Group`). Otherwise Coq will raise an error involving the context of the evar
+  in the `Group`.
 
-- `procrastinate [intropat] : H [group g]`
+- `defer [H]: E [in g]`
 
-  `procrastinate name: H group g` is a shorthand for `assert (name: H) by
-  (procrastination group g)`.
+  Introduces a new assumption `E`, named after `H`, and defer its proof in `g`.
+  This is equivalent to `assert E as H by (defer in g)`.
 
-  In other words, it adds an hypothesis of type `H` to the context, and defers
-  it proof. `group g` is optional, with the same behavior as `procrastinate`.
+  If `H` is not provided, adds `E` in front of the goal instead of adding it to
+  the context -- i.e. on a goal `G`, `defer: E` produces a goal `E -> G`.
 
-- `end procrastination`
+- `end defer`
 
-  To be called on a `end procrastination` goal. It does some cleanup and gives
-  back the variables and side-goals that have been procrastinated.
+  To be called on a `end defer` goal. It does some cleanup and gives back the
+  variables and side-goals that have been procrastinated.
 
-- `already procrastinated [group g]`
+- `deferred [in g]`
 
-  `already procrastinated group g` proves a sub-goal if it has already been
-  procrastinated before in the group `g`.
+  Tries to prove the goal using an already deferred proposition. If it fails,
+  adds all already deferred propositions to the context.
 
-  `group g` is optional, with the same behavior as in `procrastinate`.
+- `deferred [H]: E [in g]`
 
-- `already procrastinated [intropat] : H [group g]`
+  Adds an assumption `E` to the context, named after `H`, and tries to prove it
+  using an already deferred proposition. If this fails, gives back a subgoal `X1
+  -> .. -> Xn -> E`, where `X1`...`Xn` are the already deferred propositions.
 
-  `already procrastinated name : H group g` adds only one hypothesis from `g :
-  Group ...` to the context, of type `H`, and names it `name`. This is a more
-  explicit version of `already procrastinated`. E.g. with `g : Group (P /\ Q /\
-  ?G)`, `already procrastinated H: Q group g` introduces an hypothesis `H` of
-  type `Q`.
+  If `H` is not provided, adds `E` in front of the goal instead of adding it to
+  the context.
 
-  `group g` is optional, with the same behavior as in `procrastinate`.
+- `exploit deferred tac [in g]`
 
-- `with procrastinated [group g] [do tac]`
-
-  + `with procrastinated` adds all hypothesis corresponding to the already
-    procrastinated facts stored in `g`. E.g. if `g` has type `Group (P /\ Q /\
-    ?G)`, `already procrastinated group g` adds an hypothesis of type `P` and an
-    hypothesis of type `Q`.
-
-    This is useful since tactics (e.g. `omega`) are not necessarily able to peek
-    into the `Group _` hypothesis (and it is not always desirable anyway).
-
-  + `with procrastinated do tac` allows iterating on already procrastinated
-    facts. `tac` must be a tactic lambda taking an hypothesis name as input. It
-    will be called on each term that has already been procrastinated in group
-    `g`.
-
-  `group g` is optional, with the same behavior as in `procrastinate`.
-
-## "defer" variants of the tactics
-
-Variants of the tactics are also provided that use "defer" in place of
-"procrastinate", "defer" being easier to type.
-
-- `begin deferring` is an alias for `begin procrastination`
-- `defer` is an alias for `procrastinate`
-- `end deferring` is an alias for `end procrastination`
-- `already deferred` is an alias for `already procrastinated`
-- `with deferred` is an alias for `with procrastinated`
+  Calls the tactic [tac] on each proposition stored in group [g]. [tac] is
+  allowed to fail, but the whole tactic fails if no progress has been made.

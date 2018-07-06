@@ -2,62 +2,51 @@ Require Import Procrastination.Procrastination.
 Require Import Nat Arith Omega Psatz Eomega.
 
 Goal True.
-  begin procrastination assuming a b c.
+  begin defer assuming a b c.
 
-  assert (a <= b + 1). procrastinate.
-  assert (b = c + 2). procrastinate.
+  assert (a <= b + 1). defer.
+  assert (b = c + 2). defer.
   exact I.
 
-  (* [end procrastination] gives back the subgoals that have been
-     procrastinated. *)
-  end procrastination.
+  (* [end defer] gives back the subgoals that have been deferred. *)
+  end defer.
   exists 0, 2, 0. omega.
 Qed.
 
 Goal True.
-  begin procrastination.
-  assert (H1: 1 + 1 = 2) by procrastinate.
-  assert (H2: 1 + 2 = 3) by procrastinate.
-  (* [procrastinate H: foo group g] is a shorthand for
-     [assert (H: foo) by (procrastinate group g)] *)
-  procrastinate H3: (1 + 3 = 4).
+  begin defer.
+  assert (H1: 1 + 1 = 2) by defer.
+  assert (H2: 1 + 2 = 3) by defer.
+  (* [defer H: foo in g] is a shorthand for
+     [assert (H: foo) by (defer in g)] *)
+  defer H3: (1 + 3 = 4).
 
   tauto.
-  end procrastination.
+  end defer.
   repeat split; reflexivity.
 Qed.
 
 Goal True.
   (* It's also possible to explicitly name and refer to the "procrastination
      group". *)
-  begin procrastination group g assuming a b c.
-  (* [procrastinate] chooses by default the last group of the context. *)
-  assert (a = b) by procrastinate.
-  assert (b = c) by (procrastinate group g).
+  begin defer assuming a b c in g.
+  (* [defer] chooses by default the last group of the context. *)
+  assert (a = b) by defer.
+  assert (b = c) by (defer in g).
   exact I.
 
-  end procrastination.
+  end defer.
   exists 0, 0, 0. omega.
-Qed.
-
-(* Variants of the tactics named after "defer" (hence a bit easier to type) are
-   also available.
-*)
-Goal True.
-  begin deferring assuming a b c.
-  defer: (a + b = c). exact I.
-  end deferring.
-  exists 0, 0, 0. reflexivity.
 Qed.
 
 Lemma dup : forall P, P -> P -> P. auto. Qed.
 
 Goal exists (x: nat), x >= 2 /\ x <= 5 /\ x >= 1.
-  begin procrastination assuming x.
+  begin defer assuming x.
   - exists x. (* We can use the [x] we got as a witness *)
     repeat split.
-    + procrastinate.
-    + procrastinate.
+    + defer.
+    + defer.
     + (* This case is interesting: we can prove this subgoal from the
          first side-condition we procrastinated earlier.
 
@@ -68,18 +57,25 @@ Goal exists (x: nat), x >= 2 /\ x <= 5 /\ x >= 1.
       Fail omega.
 
       apply dup.
-      (* [with procrastinated do ...] iterates on already procrastinated subgoals *)
-      { with procrastinated do (fun H => generalize H). omega. }
+      (* [deferred exploit] iterates on already deferred subgoals *)
+      { deferred exploit (fun H => generalize H). omega. }
 
       apply dup.
-      (* [with procrastinated] adds the procrastinated facts to the context *)
-      { with procrastinated. omega. }
+      (* [deferred] adds the procrastinated facts to the goal *)
+      { deferred. omega. }
 
-      (* finally, [already procrastinated: H] adds H if it has already been
-         procrastinated. *)
-      already procrastinated: (x >= 2). omega.
+      apply dup.
+      (* [deferred H: E] adds E as H if it has already been deferred. *)
+      deferred H: (x >= 2). omega.
 
-  - end procrastination.
+      (* [deferred H: E] can also be used to add facts _derivable_ from deferred
+         facts *)
+      deferred H: (x >= 1).
+      { (* we get a subgoal with all the deferred facts *)
+        omega. }
+      assumption.
+
+  - end defer.
   (* The [eomega] tactic (from Eomega.v) finds instantiations by using a
      bruteforce strategy. *)
   eomega.
@@ -119,23 +115,23 @@ Lemma solve_cost_ineqs_clean :
   monotonic f /\
   forall n, 0 < n -> 2 + f (n / 2) <= f n.
 Proof.
-  begin procrastination assuming a b c.
+  begin defer assuming a b c.
   exists (fun n => if zerop n then c else a * log2 n + b).
   repeat split.
-  { simpl. procrastinate. }
+  { simpl. defer. }
   { intros x y ?. repeat (destruct zerop); try omega.
-    - enough (c <= b) by lia. procrastinate.
+    - enough (c <= b) by lia. defer.
     - pose proof (Nat.log2_le_mono x y). clear g; nia. }
   { intros n Hn.
     destruct (zerop n) as [|_]; [ exfalso; omega |].
     destruct (zerop (n / 2)) as [E|].
     - assert (n = 1). { rewrite Nat.div_small_iff in E; omega. }
       subst n. change (log2 1) with 0. rewrite Nat.mul_0_r, Nat.add_0_l.
-      procrastinate.
+      defer.
     - assert (2 <= n). { rewrite (Nat.div_mod n 2); omega. }
       rewrite <-(log2_step n) by auto. rewrite Nat.mul_add_distr_l.
-      enough (2 <= a) by omega. procrastinate. }
-  end procrastination.
+      enough (2 <= a) by omega. defer. }
+  end defer.
   eomega.
 Qed.
 
@@ -144,18 +140,18 @@ Lemma solve_cost_ineq :
    forall n,
    1 + (if zerop n then 0 else 1 + max (f (n / 2)) (f (n - (n / 2) - 1))) <= f n.
 Proof.
-  begin procrastination assuming f. exists f.
+  begin defer assuming f. exists f.
   intro n.
   destruct (zerop n) as [|H].
-  { subst n. simpl. procrastinate. }
+  { subst n. simpl. defer. }
   { rewrite max_l; swap 1 2.
-    { procrastinate M: (monotonic f). apply M.
+    { defer M: (monotonic f). apply M.
       rewrite (Nat.div_mod n 2) at 1; [| omega].
       pose proof (Nat.mod_upper_bound n 2); omega. }
 
     { rewrite Nat.add_assoc. change (1+1) with 2.
-      revert n H. procrastinate. } }
-  end procrastination.
+      revert n H. defer. } }
+  end defer.
 
   apply solve_cost_ineqs_clean.
 Qed.

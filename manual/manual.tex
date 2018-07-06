@@ -218,7 +218,7 @@ accumulate a set of constraints.
 
 \vspace{0.5em}
 
-The script starts with \texttt{begin procrastination assuming a b c} which
+The script starts with \texttt{begin defer assuming a b c} which
 introduces the parameters, as well as a ``group'' $g$, using an evar to collect
 the constraints (1). Note that $a$, $b$ and $c$ are not evars themselves,
 instead they appear as abstract variables. Note also that
@@ -227,10 +227,10 @@ the type of these variables
 is inferred to be \co{nat} only further on in the proof script. After
 instantiating the function with the proposed solution, the first inequality
 simplifies to a condition on $c$ (2). This condition is stored (in $g$) for
-later retrieval, using the \texttt{procrastinate} tactic, which discharges the
+later retrieval, using the \texttt{defer} tactic, which discharges the
 subgoal (3). Similarly, the other two inequalities yield side conditions about
-$a$, $b$ and $c$ that can be \texttt{procrastinate}d. Finally, \texttt{end
-  procrastination} retrieves the collected conditions, which the user must then
+$a$, $b$ and $c$ that can be \texttt{defer}red. Finally, \texttt{end
+  defer} retrieves the collected conditions, which the user must then
 prove. Here, this is done by an ad hoc user-defined tactic, \co{eomega}.
 
 Observe that the final proof script never mentions the actual witnesses: we
@@ -261,18 +261,18 @@ example.
 \vspace{1em}
 
 The first step of the proof is to start collecting constraints about \co{f},
-using \co{begin procrastination assuming f} (1). This gives us a new identifier
+using \co{begin defer assuming f} (1). This gives us a new identifier
 \co{f}, that we can use right away as a witness for the existential
 quantification at the head of the goal. Case splitting first allows extracting
 the inequation for the base case (2). Some work can be done in the recursive
 case (3), if we additionally assume that \co{f} is monotonic (4). In that case
 the \co{max ...} can be simplified to its first argument (5). The inequation at
 (5) is the simplified inequation for the recursive case. However, it is not
-possible to call \co{procrastinate} at this point: the goal depends on the local
+possible to call \co{defer} at this point: the goal depends on the local
 variable \co{n}, while the set of collected constraints can only depend on
 \co{f}. The solution is to generalize the goal to any positive \co{n} (6), by
 moving \co{n} and \co{Hn} from the local context to the goal. Finishing the
-procrastination yields the set of simplified constraints, which corresponds to
+deferring process yields the set of simplified constraints, which corresponds to
 the initial goal of the previous example (7).
 
 Here again, the point of using \emph{Procrastination} is to impose a \emph{proof
@@ -298,15 +298,15 @@ There are two key aspects to this process.
 
 \paragraph{Side-conditions are collected and gathered under a common context.}
 Specifically, it is the context at the point of calling``\co{begin}
-\co{procrastination assuming a b c}'', extended with the names \co{a},
+\co{defer assuming a b c}'', extended with the names \co{a},
 \co{b} and \co{c}. Only side-conditions \co{P}, \co{Q} and \co{R} that make
-sense in this context can be deferred using \co{procrastination}.
+sense in this context can be deferred using \co{defer}.
 
-More generally, to each ``procrastination block'' (beginning with \co{begin
-  procrastination} and ending with \co{end procrastination}) corresponds a proof
+More generally, to each ``defer block'' (beginning with \co{begin
+  defer} and ending with \co{end defer}) corresponds a proof
 context in which the side-conditions will be gathered. This is in fact
 materialized by an assumption of type ``\co{Group (...)}'' added to the context
-by \co{begin procrastination}. This assumption stores the current collection of
+by \co{begin defer}. This assumption stores the current collection of
 side-conditions, and can be named explicitly by the user.
 
 Requiring all side-conditions to be expressed in the same context allows the
@@ -333,13 +333,13 @@ side-conditions have been collected, the user is free to introduce evars for
 \co{a}, \co{b} and \co{c}, if needed to prove the goal \co{exists a b c, P /\\ Q
   /\\ R}.
 
-\section{Nesting \emph{Procrastination} blocks}
+\section{Nesting \texttt{defer} blocks}
 
-Interestingly, it is possible to nest procrastinate blocks in an arbitrary way.
+Interestingly, it is possible to nest defer blocks in an arbitrary way.
 In some sense, collecting side-conditions is done in a ``well-scoped'' manner.
-For example, it is possible to open a second procrastinate block while being in
-a procrastinate block. Then, the nested block will have a larger context than
-the enclosing block. When using \co{procrastinate} on a side-condition, the user
+For example, it is possible to open a second defer block while being in
+a defer block. Then, the nested block will have a larger context than
+the enclosing block. When using \co{defer} on a side-condition, the user
 can control in which \co{Group} (and therefore in which context) the
 side-condition gets collected.
 
@@ -356,25 +356,25 @@ side-condition gets collected.
 %% %% can be contrasted w/ shelve
 %%
 %% This is in contrast with Coq's \emph{shelving} mechanism. Just like
-%% \co{procrastinate}, \emph{shelving} discharges a subgoal by putting it away and
+%% \co{defer}, \emph{shelving} discharges a subgoal by putting it away and
 %% storing it for later. Then, \emph{unshelving} retrieves the collected subgoals.
 %% This may seem very similar to \emph{Procrastinate} -- but there are crucial
 %% differences. Shelving a subgoal captures the whole context of the subgoal. Then,
 %% unshelving restores the captured subgoals, as as many distinct subgoals.
 %% \emph{Procrastinate} requires the user to discharge side-conditions under a
 %% common context, but in the end gathers them all in a single subgoal (given by
-%% \co{end procrastination}).
+%% \co{end defer}).
 
 
 \section{Implementing \emph{Procrastination}: core ideas}
 
 In essence, the implementation of \emph{Procrastination} is extremely simple. As
-its core, ``\co{begin procrastination} \co{assuming a}'' is nothing more than
-``\co{eapply procrastinate\_1}'', where \co{procrastinate\_1} is the following
+its core, ``\co{begin defer} \co{assuming a}'' is nothing more than
+``\co{eapply defer\_1}'', where \co{defer\_1} is the following
 tautological lemma:
 
 \begin{coq}
-  Lemma procrastinate_1 : forall A (P: Prop) (Q: A -> Prop),
+  Lemma defer_1 : forall A (P: Prop) (Q: A -> Prop),
     (forall a, Q a -> P) ->
     (exists a, Q a) ->
     P.
@@ -452,7 +452,7 @@ discharged subgoals, and an evar for future ones. For instance:
 
 \vspace{0.3em}
 
-This is in fact precisely how the \co{procrastinate} tactic is implemented.
+This is in fact precisely how the \co{defer} tactic is implemented.
 
 \subsection{Dealing with existentials in the goal: avoiding the proliferation of evars}
 
@@ -488,7 +488,7 @@ is massaging the proof so that it is setup more conveniently.
 
 Finally, the lemma above can be generalized to support an arbitrary number of
 quantified variables (including 0, in which case this corresponds to the
-previous subsection). This is in essence how \co{begin procrastination} is
+previous subsection). This is in essence how \co{begin defer} is
 implemented.
 
 %%\subsection{}

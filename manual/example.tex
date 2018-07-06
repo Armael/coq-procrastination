@@ -5,16 +5,15 @@ Goal exists (f: nat -> nat),
   monotonic f /\
   forall n, 0 < n -> 2 + f (n/2) <= f n.
 Proof.
-  /&begin procrastination assuming a b c&/. /*(1)*/
-  \exists (fun n => if zerop n then c
-                  else a * log2 n + b).
+  /&begin defer assuming a b c&/. /*(1)*/
+  \exists (fun n => if zerop n then c else a * log2 n + b).
   repeat split.
-  { simpl. /*(2)*/ /&procrastinate&/. /*(3)*/ }
-  { ... (* c <= b *) /&procrastinate&/. ... }
+  { simpl. /*(2)*/ /&defer&/. /*(3)*/ }
+  { ... (* c <= b *) /&defer&/. ... }
   { intros.
-    ... (* 2 + c <= b *) /&procrastinate&/.
-    ... (* 2 <= a *) /&procrastinate&/. }
-  /&end procrastination&/.
+    ... (* 2 + c <= b *) /&defer&/.
+    ... (* 2 <= a *) /&defer&/. }
+  /&end defer&/.
   /*(4)*/ eomega.
 Qed.
 \end{coql}

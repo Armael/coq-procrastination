@@ -6,13 +6,13 @@ Goal exists (f: nat -> nat),
          else 1 + max (f (n/2)) (f (n - (n/2) - 1)))
     <= f n.
 Proof.
-  /&begin procrastination assuming f&/. /*(1)*/ \exists f.
+  /&begin defer assuming f&/. /*(1)*/ \exists f.
   intro n. destruct (zerop n) as [|Hn].
-  { subst n. simpl. /*(2)*/ /&procrastinate&/. }
+  { subst n. simpl. /*(2)*/ /&defer&/. }
   { rewrite max_l; swap 1 2.
-    { /*(3)*/ /&procrastinate M: (monotonic f)&/. /*(4)*/ ... }
-    { ... /*(5)*/ revert n Hn. /*(6)*/ /&procrastinate&/. } }
-  /&end procrastination&/.
+    { /*(3)*/ /&defer M: (monotonic f)&/. /*(4)*/ ... }
+    { ... /*(5)*/ revert n Hn. /*(6)*/ /&defer&/. } }
+  /&end defer&/.
   /*(7)*/ ...
 Qed.
 \end{coql}

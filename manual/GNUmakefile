@@ -31,7 +31,7 @@ pdf: $(DOC).pdf
 tactics_reference.tex: ../TacticsReference.md
 	pandoc -o $@ $<
 
-loop:
+loop: tactics_reference.tex
 	latexmk -pdfxe -pvc $(DOC)
 
 clean::
