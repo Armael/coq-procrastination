@@ -34,19 +34,28 @@
 
 - `deferred [in g]`
 
-  Tries to prove the goal using an already deferred proposition. If it fails,
-  adds all already deferred propositions to the context.
+  Adds to the goal all the already deferred propositions. I.e. on a goal `G`,
+  gives back a goal `X1 -> .. -> Xn -> E`, where `X1`..`Xn` are the already
+  deferred propositions.
 
 - `deferred [H]: E [in g]`
 
-  Adds an assumption `E` to the context, named after `H`, and tries to prove it
-  using an already deferred proposition. If this fails, gives back a subgoal `X1
-  -> .. -> Xn -> E`, where `X1`...`Xn` are the already deferred propositions.
+  Adds an assumption `E` to the context, named after `H`, and produces a subgoal
+  `X1 -> .. -> Xn -> E`, where `X1`..`Xn` are the already deferred propositions.
+  As a convenience feature, when `E` is trivially provable from `X1`..`Xn`, this
+  subgoal is automatically discharged using `auto`.
+
+  This is equivalent to `assert E as H; [ deferred in g; try now auto |]`.
 
   If `H` is not provided, adds `E` in front of the goal instead of adding it to
   the context.
 
 - `exploit deferred tac [in g]`
 
-  Calls the tactic [tac] on each proposition stored in group [g]. [tac] is
-  allowed to fail, but the whole tactic fails if no progress has been made.
+  This allows iterating a user-provided tactic `tac` on the propositions stored
+  in the group `g`. It is fine for `tac` to fail for some of the propositions.
+  The whole tactic (`exploit deferred tac`) will fail if `tac` did not make the
+  proof progress overall (i.e. if nothing happened).
+
+  For example, to try rewriting with all deferred facts, one would do
+  `exploit deferred (fun H => rewrite H)`.

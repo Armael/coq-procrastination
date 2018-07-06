@@ -714,8 +714,7 @@ Abort.
 *)
 
 Ltac deferred_core g :=
-  first [ solve [ deferred exploit (fun H => apply H) in g ]
-        | deferred exploit (fun H => generalize H) in g ].
+  deferred exploit (fun H => generalize H) in g.
 
 Tactic Notation "deferred" "in" ident(g) :=
   deferred_core g.
@@ -725,11 +724,11 @@ Tactic Notation "deferred" :=
   deferred in g.
 
 Tactic Notation "deferred" simple_intropattern(H) ":" uconstr(E) "in" ident(g) :=
-  assert E as H; [ deferred in g |].
+  assert E as H; [ deferred in g; try now auto |].
 
 Tactic Notation "deferred" ":" uconstr(E) "in" ident(g) :=
   let H := fresh in
-  assert E as H; [ deferred in g | revert H ].
+  assert E as H; [ deferred in g; try now auto | revert H ].
 
 Tactic Notation "deferred" simple_intropattern(H) ":" uconstr(E) :=
   let g := Marker.find_group in
@@ -750,12 +749,12 @@ Abort.
 
 (* Test *)
 Goal True.
-  begin defer.
-  defer _: (1 + 2 = 3).
-  defer _: (forall n, n + 0 = n).
-  deferred _: (3 + 0 = 3).
-  deferred: (forall n, n = n + 0).
-  { auto. }
+  begin defer assuming n.
+  defer _: (1+2=3).
+  defer _: (n + 1 = n).
+  deferred ?: (n = n + 1); [].
+  deferred: (n + 2 = n).
+  { intros. admit. }
   intros ?.
 Abort.
 
