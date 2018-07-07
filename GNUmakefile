@@ -1,6 +1,6 @@
 # Delegate these commands.
 
-.PHONY: all clean examples manual
+.PHONY: all clean examples manual install
 
 all:
 	@ $(MAKE) -C src $@
@@ -10,6 +10,9 @@ examples: all
 
 manual:
 	@ $(MAKE) -C manual
+
+install:
+	@ $(MAKE) -C src $@
 
 clean:
 	@ $(MAKE) -C src $@
