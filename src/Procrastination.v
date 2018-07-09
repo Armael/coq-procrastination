@@ -36,6 +36,9 @@ Definition end_defer (P : Type) := P.
    used. *)
 Definition group (P : Prop) := P.
 
+Lemma group_fold : forall (P: Prop), P -> group P.
+Proof. auto. Qed.
+
 Ltac find_group :=
   match goal with
   | H : group _ |- _ => constr:(H)
@@ -43,6 +46,9 @@ Ltac find_group :=
 
 End Marker.
 
+(* This is necessary to prevent tactics like [eauto] to instantiate the evar in
+   the group with e.g. [False]. *)
+Global Opaque Marker.group.
 
 (* A very simple implementation of [begin defer] could be as follows:
 
@@ -257,7 +263,7 @@ Ltac prove_begin_defer_helper :=
   intros ? ? ? H;
   unfold Marker.end_defer in *;
   repeat (let x := fresh "x" in destruct H as (x & H));
-  eauto.
+  eauto using Marker.group_fold.
 
 (* Tests for the tactic above. *)
 Goal forall (g : Prop) (P : Type),
@@ -357,7 +363,7 @@ Ltac mk_begin_defer_helper ids :=
     | Prop => mk_begin_defer_helper_Prop ids H
     | _ => mk_begin_defer_helper_Type ids H
     end;
-    cut H; subst H; [| prove_begin_defer_helper]
+    cut H; subst H; [| now prove_begin_defer_helper]
   end.
 
 (* Tests *)
@@ -637,8 +643,9 @@ Ltac defer_aux tm ty :=
 
 Ltac defer_core group :=
   let ty := type of group in
-  let ty' := (eval unfold Marker.group in ty) in
-  defer_aux group ty'.
+  match ty with
+  | Marker.group ?G => defer_aux group G
+  end.
 
 Tactic Notation "defer" "in" ident(g) :=
   defer_core g.
@@ -688,8 +695,9 @@ Ltac deferred_exploit_aux tm ty tac :=
 
 Ltac deferred_exploit_core g tac :=
   let ty := type of g in
-  let ty' := (eval unfold Marker.group in ty) in
-  progress (deferred_exploit_aux g ty' tac).
+  match ty with
+  | Marker.group ?G => progress (deferred_exploit_aux g G tac)
+  end.
 
 Tactic Notation "deferred" "exploit" tactic(tac) "in" ident(g) :=
   deferred_exploit_core g tac.
