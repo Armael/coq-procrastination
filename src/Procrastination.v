@@ -803,13 +803,17 @@ Ltac cleanup_conj_goal_core :=
 
 Ltac collect_exists_ids_loop G ids :=
   lazymatch G with
-  | (fun g => exists x, @?body g x) =>
-    let G' := constr:(fun (z : _ * _) => body (fst z) (snd z)) in
-    let G' := eval cbn beta in G' in
-    let ids' := collect_exists_ids_loop G' ids in
-    constr:(fun (x : unit) => ids')
+  | (fun g => exists x, @?body g x) => collect_exists_ids_aux ids x body
+  | (fun g => { x & @?body g x }) => collect_exists_ids_aux ids x body
+  | (fun g => { x | @?body g x }) => collect_exists_ids_aux ids x body
   | _ => constr:(ids)
-  end.
+  end
+
+with collect_exists_ids_aux ids x body :=
+  let G' := constr:(fun (z : _ * _) => body (fst z) (snd z)) in
+  let G' := eval cbn beta in G' in
+  let ids' := collect_exists_ids_loop G' ids in
+  constr:(fun (x : unit) => ids').
 
 Ltac collect_exists_ids g :=
   collect_exists_ids_loop (fun (_:unit) => g) tt.
@@ -818,7 +822,17 @@ Ltac collect_exists_ids g :=
 Goal Marker.end_defer (exists a b c, a + b = c).
   match goal with |- Marker.end_defer ?g =>
     let ids := collect_exists_ids g in
-    (* MkHelperLemmas.print_ids ids *) (* prints: a b c *)
+    (* MkHelperLemmas.print_ids ids; *)
+    (* prints: a b c *)
+    idtac
+  end.
+Abort.
+
+Goal Marker.end_defer { a & { b & { c | a + b = c } } }.
+  match goal with |- Marker.end_defer ?g =>
+    let ids := collect_exists_ids g in
+    (* MkHelperLemmas.print_ids ids; *)
+    (* prints: a b c *)
     idtac
   end.
 Abort.
@@ -855,6 +869,13 @@ Goal True.
   assert (a + b = c). defer.
   exact I.
 
+  end defer.
+Abort.
+
+Goal nat.
+  begin defer assuming a b c.
+  assert (a + b = c). defer.
+  exact 0.
   end defer.
 Abort.
 
