@@ -635,7 +635,7 @@ Abort.
    proof.
 *)
 Ltac defer_aux tm ty :=
-  let ty' := (eval simpl in ty) in
+  let ty' := (eval hnf in ty) in
   lazymatch ty' with
   | and ?x ?y => defer_aux (@proj2 x y tm) y
   | _ => eapply (proj1 tm)
