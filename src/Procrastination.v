@@ -790,8 +790,11 @@ Ltac ands_remove_last ty :=
 Ltac cleanup_conj_goal_aux tm ty :=
   lazymatch ty with
   | and ?x ?y =>
-    split; [apply (@proj1 x y tm) | cleanup_conj_goal_aux (@proj2 x y tm) y]
-  | ?x => split; [apply tm | exact I]
+    tryif is_evar y
+    then
+      (split; [apply tm | exact I])
+    else
+      (split; [apply (@proj1 x y tm) | cleanup_conj_goal_aux (@proj2 x y tm) y])
   end.
 
 (* Expose this tactic as it may be useful for procrastination-like setups *)
@@ -799,9 +802,8 @@ Ltac cleanup_conj_goal_core :=
   let H_P_clean := fresh "H_P_clean" in
   intro H_P_clean;
   match goal with
-  | |- ?P_to_clean =>
-    let P_clean := ands_remove_last P_to_clean in
-    cleanup_conj_goal_aux H_P_clean P_clean
+  | |- ?P =>
+    cleanup_conj_goal_aux H_P_clean P
   end.
 
 (* A tactic to collect the names of the "exists" in from of the goal. This is
@@ -884,6 +886,12 @@ Goal nat.
   begin defer assuming a b c.
   assert (a + b = c). defer.
   exact 0.
+  end defer.
+Abort.
+
+Goal 1= 2 /\ 2=3.
+  begin defer.
+  defer.
   end defer.
 Abort.
 
