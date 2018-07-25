@@ -780,9 +780,9 @@ Ltac cleanup_conj_goal_aux tm ty :=
   | and ?x ?y =>
     tryif is_evar y
     then
-      (split; [apply tm | exact I])
+      (split; [refine tm | exact I])
     else
-      (split; [apply (@proj1 x y tm) | cleanup_conj_goal_aux (@proj2 x y tm) y])
+      (split; [refine (@proj1 x _ tm) | cleanup_conj_goal_aux uconstr:(@proj2 x _ tm) y])
   end.
 
 (* Expose this tactic as it may be useful for procrastination-like setups *)
@@ -859,7 +859,7 @@ Goal True.
   tauto.
   end defer.
 
-  repeat split; reflexivity.
+  do 3 split.
 Qed.
 
 Goal True.
