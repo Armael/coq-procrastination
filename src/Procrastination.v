@@ -775,18 +775,6 @@ Ltac introv_rec :=
   | |- _ => idtac
   end.
 
-(* (A /\ B /\ C /\ D) -> (A /\ B /\ C) *)
-Ltac ands_remove_last ty :=
-  lazymatch ty with
-  | and ?x ?y =>
-    lazymatch y with
-    | and _ _ =>
-      let y' := ands_remove_last y in
-      constr:(and x y')
-    | _ => constr:(x)
-    end
-  end.
-
 Ltac cleanup_conj_goal_aux tm ty :=
   lazymatch ty with
   | and ?x ?y =>
