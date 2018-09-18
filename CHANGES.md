@@ -1,3 +1,14 @@
+v1.2 2018-09-18
+---------------
+
+- Speed up defer when "Group GOAL" contains redices
+  (Fabian Kunze)
+- Fixed a bug when deferring conjunction right before 'end defer'
+  (Fabian Kunze)
+- Fixed a bug that sometimes left an '/\ True' at the end of an deferred goal
+  after 'end defer'
+  (Fabian Kunze)
+
 v1.1 2018-07-09
 ---------------
 
