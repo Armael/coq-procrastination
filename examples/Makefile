@@ -41,15 +41,9 @@ export
 
 .PHONY: all clean
 
-# The target all is split as a sequence (prepare; finish). The only reason why
-# this is done is so that the variable V is evaluated *after* CFML has run. I
-# have tried various other ways, but failed miserably; $(shell) is evaluated
-# too early, and my attempts to use `...` ran into problems with spaces and
-# quoting.
-
 all:
-	@ $(MAKE) --no-print-directory -f ../src/Makefile.coq _CoqProject $@
-	@ $(MAKE) --no-print-directory -C ../src $@
+	@ $(MAKE) --no-print-directory -C .. $@
+	@ $(MAKE) --no-print-directory -f Makefile.coq _CoqProject $@
 
 clean:
-	@ $(MAKE) --no-print-directory -f ../src/Makefile.coq $@
+	@ $(MAKE) --no-print-directory -f Makefile.coq $@
