@@ -109,7 +109,7 @@ Module MkHelperLemmas.
    using multiple [refine], thus constructing the desired lemma statement.
 *)
 Ltac transparent_assert name type :=
-  unshelve refine (let name := _ : type in _).
+  unshelve notypeclasses refine (let name := _ : type in _).
 
 (* This is generally useful in tactics to have lists of things (e.g.
    assumptions) of heterogeneous types, by "boxing" them using [boxer]. *)
