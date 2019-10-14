@@ -224,13 +224,15 @@ Ltac mk_sigT_sig ids goalty cont :=
   | tt => cont (@nil Boxer)
   | (fun x => tt) =>
     let X := fresh x in
-    refine (sig (fun X => _) : goalty);
-    cont (cons (@boxer _ X) (@nil Boxer))
+    refine (sig (fun (X : _) => _) : goalty);
+    let X_ty := type of X in
+    cont (cons (@boxer X_ty X) (@nil Boxer))
   | (fun x => _) =>
     let ids' := eval cbv beta in (ids tt) in
     let X := fresh x in
-    refine (sigT (fun X => _) : goalty);
-    mk_sigT_sig ids' goalty ltac:(fun x => cont (cons (@boxer _ X) x))
+    refine (sigT (fun (X : _) => _) : goalty);
+    let X_ty := type of X in
+    mk_sigT_sig ids' goalty ltac:(fun x => cont (cons (@boxer X_ty X) x))
   end.
 
 (* Similarly, [mk_exists ids goalty cont] refines the proof term to be [exists x_1
@@ -241,8 +243,9 @@ Ltac mk_exists ids goalty cont :=
   | (fun x => _) =>
     let ids' := eval cbv beta in (ids tt) in
     let X := fresh x in
-    refine (exists X, _ : goalty);
-    mk_exists ids' goalty ltac:(fun x => cont (cons (@boxer _ X) x))
+    refine (exists (X : _), _ : goalty);
+    let X_ty := type of X in
+    mk_exists ids' goalty ltac:(fun x => cont (cons (@boxer X_ty X) x))
   end.
 
 Ltac introsType :=
